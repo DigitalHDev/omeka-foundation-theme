@@ -10,6 +10,34 @@ $lang = $this->lang();
 $valueLang = $filterLocale ? [$lang, ''] : null;
 
 $query = $this->params()->fromQuery();
+
+$templateName = null;
+// Dictionary of template IDs to template names
+$templateNames = [
+    '14' => 'Collections',
+    '15' => 'Documents',
+    '16' => 'Events',
+    '17' => 'People',
+    '18' => 'Organizations',
+    '20' => 'Photographs'
+    // Add more mappings as needed
+];
+if (isset($query['resource_template_id'])) {
+    $templateId = $query['resource_template_id'];
+    // If it's an array, get the first element
+    if (is_array($templateId)) {
+        $templateId = reset($templateId);
+    }
+    
+    // Look up template name in the dictionary
+    if (isset($templateNames[$templateId])) {
+        $templateName = $templateNames[$templateId];
+    } else {
+        // Fallback if template ID isn't in the dictionary
+        error_log('Template ID not found in dictionary: ' . $templateId);
+    }
+}
+
 $itemSetShow = isset($itemSet);
 if ($itemSetShow) {
     $this->headLink()->appendStylesheet($this->assetUrl('css/resource-page-blocks.css', 'Omeka'));
@@ -91,12 +119,12 @@ $sortHeadings = [
     </div>
 
     <div class="item-set-items">
-    <?php echo '<h3>' . $escape($translate('Items')) . '</h3>'; ?>
+    <?php echo '<h3>' . $escape($templateName ?: $translate('Items'), 2) . '</h3>'; ?>
 <?php else: ?>
-    <?php echo $this->pageTitle($translate('Items'), 2); ?>
+    <?php echo $this->pageTitle($templateName ?: $translate('Items'), 2); ?>
 <?php endif; ?>
 
-<?php echo $this->searchFilters(); ?>
+<?php /*echo $this->searchFilters(); */?>
 <div class="browse-control-mobile">
 <button type="button" class="browse-toggle closed"><?php echo $translate('Options'); ?></button>
 </div>
