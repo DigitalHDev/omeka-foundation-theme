@@ -1,3 +1,25 @@
+document.addEventListener('DOMContentLoaded', function() {
+  const resourceNames = document.querySelectorAll('.resource-name, .title');
+  
+  resourceNames.forEach(span => {
+    // Hebrew Unicode range: \u0590-\u05FF
+    if (/[\u0590-\u05FF]/.test(span.textContent)) {
+      // Contains Hebrew - apply RTL styling
+      span.style.direction = 'rtl';
+      span.style.textAlign = 'right';
+      span.style.display = 'inline-block';
+      span.style.width = '100%';
+    } else {
+      // No Hebrew - apply LTR styling
+      span.style.direction = 'ltr';
+      span.style.textAlign = 'left';
+      span.style.display = 'inline-block';
+      span.style.width = '100%';
+    }
+  });
+});
+
+
 (function($) {
 
     // Get parameter from current URL. Source: https://stackoverflow.com/questions/5448545/how-to-retrieve-get-parameters-from-javascript
