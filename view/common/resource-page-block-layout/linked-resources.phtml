@@ -1,0 +1,24 @@
+<?php
+$options = [
+    'page' => $this->params()->fromQuery('page', 1),
+    'perPage' => 25,
+    'firstDegreeResourceType' => 'items',
+    'secondDegreeResourceType' => 'items',
+    'firstDegreeTemplate' => 1, // Replace with your first degree template ID
+    'secondDegreeTemplate' => 2  // Replace with your second degree template ID
+];
+
+if ($this->siteSetting('exclude_resources_not_in_site', false)) {
+    $options['siteId'] = $this->currentSite()->id();
+}
+
+// Use the new helper
+$secondDegreeResourcesHtml = $this->SecondDegreeResources($resource, $options);
+?>
+
+<?php if ($secondDegreeResourcesHtml): ?>
+<div id="resources-linked">
+    <h3><?php echo $this->translate('Second Degree Linked Resources'); ?></h3>
+    <?php echo $secondDegreeResourcesHtml; ?>
+</div>
+<?php endif; ?>
