@@ -1,24 +1,65 @@
 <?php
+// Standard linked resources (first-degree)
 $options = [
     'page' => $this->params()->fromQuery('page', 1),
     'perPage' => 25,
-    'firstDegreeResourceType' => 'items',
-    'secondDegreeResourceType' => 'items',
-    'firstDegreeTemplate' => 1, // Replace with your first degree template ID
-    'secondDegreeTemplate' => 2  // Replace with your second degree template ID
+    'resourceProperty' => $this->params()->fromQuery('resource_property')
 ];
 
-if ($this->siteSetting('exclude_resources_not_in_site', false)) {
+// Site setting check - apply to all queries
+$excludeResourcesNotInSite = $this->siteSetting('exclude_resources_not_in_site', false);
+if ($excludeResourcesNotInSite) {
     $options['siteId'] = $this->currentSite()->id();
 }
 
-// Use the new helper
-$secondDegreeResourcesHtml = $this->SecondDegreeResources($resource, $options);
+// Get standard linked resources HTML output
+$standardLinkedResources = $resource->displaySubjectValues($options);
+
+// Check if we should show second-degree resources
+$showSecondDegree = $this->params()->fromQuery('show_second_degree', false);
+
+$showSecondDegree = 1;
 ?>
 
-<?php if ($secondDegreeResourcesHtml): ?>
+<?php if ($standardLinkedResources): ?>
 <div id="resources-linked">
-    <h3><?php echo $this->translate('Second Degree Linked Resources'); ?></h3>
-    <?php echo $secondDegreeResourcesHtml; ?>
+    <h3><?php echo $this->translate('Linked Resources'); ?></h3>
+    <?php echo $standardLinkedResources; ?>
 </div>
 <?php endif; ?>
+
+<?php
+// Show second-degree linked resources if enabled
+
+    echo "<!-- Debug: Processing second-degree resources. Parameter value: " . ($showSecondDegree ? 'true' : 'false') . " -->";
+
+    // Configure options for the second-degree resources
+    $secondDegreeOptions = [
+        'page' => $this->params()->fromQuery('page_second', 1), // Different pagination parameter
+        'perPage' => 25,
+        // Add the template IDs specific to your use case
+        'firstDegreeResourceType' => 'items',
+        'secondDegreeResourceType' => 'items',
+        'firstDegreeTemplate' => 16, // Event template ID
+        'secondDegreeTemplate' => 17, // Person template ID
+        'showConnectingResource' => true // Show which event connects the person to the organization
+    ];
+    
+    // Apply site setting filter if needed
+    if ($excludeResourcesNotInSite) {
+        $secondDegreeOptions['siteId'] = $this->currentSite()->id();
+    }
+    
+    // Get second-degree linked resources HTML output
+    $secondDegreeResources = $this->SecondDegreeResources($resource, $secondDegreeOptions);
+    
+    if ($secondDegreeResources): 
+?>
+<div id="second-degree-resources-linked">
+    <h3><?php echo $this->translate('People Who Participated in Events at This Organization'); ?></h3>
+    <?php echo $secondDegreeResources; ?>
+</div>
+<?php 
+    endif;
+
+?>
