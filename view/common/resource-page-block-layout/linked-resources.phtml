@@ -17,7 +17,7 @@ $standardLinkedResources = $resource->displaySubjectValues($options);
 
 // Check if we should show second-degree resources
 $showSecondDegree = $this->params()->fromQuery('show_second_degree', false);
-$showSecondDegree = 1;
+$showSecondDegree = 1; // Force enabled for testing
 
 // Get the current resource's template ID
 $currentTemplateId = null;
@@ -35,65 +35,83 @@ if ($resource->resourceTemplate()) {
 
 <?php
 // Configuration mapping for different resource template types
-// Format: templateId => [config]
+// Format: [config1, config2, ...] where each config is a complete configuration
 $secondDegreeConfigs = [
     // Organization template (ID: 18)
     18 => [
-        'title' => 'People Who Participated in Events at This Organization',
-        'firstDegreeResourceType' => 'items',
-        'secondDegreeResourceType' => 'items',
-        'firstDegreeTemplate' => 16, // Event template ID
-        'secondDegreeTemplate' => 17, // Person template ID
-        'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
-        'secondDegreePropertyIds' => [501] // Properties connecting Event -> Person
+        // Direct connection configuration
+        [
+            'title' => 'People Who Participated in Events at This Organization',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 17, // Person template ID
+            'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
+            'secondDegreePropertyIds' => [501], // Properties connecting Event -> Person
+            'direction' => 'direct'
+        ],
+        // Reverse connection configuration
+        [
+            'title' => 'Documents Associated with Events at This Organization',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 15, // Document template ID
+            'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Document -> Event
+            'direction' => 'reverse'
+        ]
     ],
-    // Project template (example: ID: 10009)
-    10009 => [
-        'title' => 'Publications Related to This Project',
-        'firstDegreeResourceType' => 'items',
-        'secondDegreeResourceType' => 'items',
-        'firstDegreeTemplate' => 20, // Research Activity template ID
-        'secondDegreeTemplate' => 21, // Publication template ID
-        'firstDegreePropertyIds' => [7, 8], // Properties connecting Project -> Research Activity
-        'secondDegreePropertyIds' => [9, 10] // Properties connecting Research Activity -> Publication
+    // Person template (ID: 17)
+    17 => [
+        // Reverse connection configuration
+        [
+            'title' => 'Documents belonging to Events Participated In',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Research Activity template ID
+            'secondDegreeTemplate' => 15, // Grant template ID
+            'firstDegreePropertyIds' => [501], // Properties connecting Project -> Research Activity
+            'secondDegreePropertyIds' => [13], // Properties connecting Grant -> Research Activity
+            'direction' => 'reverse'
+        ]
     ]
     // Add more configurations for other template IDs as needed
 ];
 
-// Only proceed if we have a configuration for the current template
+// Only proceed if we have configurations for the current template
 if ($showSecondDegree && $currentTemplateId && isset($secondDegreeConfigs[$currentTemplateId])):
-    $config = $secondDegreeConfigs[$currentTemplateId];
+    // Get all configurations for this template
+    $templateConfigs = $secondDegreeConfigs[$currentTemplateId];
     
-    echo "<!-- Debug: Processing second-degree resources for template ID: $currentTemplateId -->";
-
-    // Configure options for the second-degree resources
-    $secondDegreeOptions = [
-        'page' => $this->params()->fromQuery('page_second', 1), // Different pagination parameter
-        'perPage' => 25,
-        'firstDegreeResourceType' => $config['firstDegreeResourceType'],
-        'secondDegreeResourceType' => $config['secondDegreeResourceType'],
-        'firstDegreeTemplate' => $config['firstDegreeTemplate'],
-        'secondDegreeTemplate' => $config['secondDegreeTemplate'],
-        'firstDegreePropertyIds' => $config['firstDegreePropertyIds'],
-        'secondDegreePropertyIds' => $config['secondDegreePropertyIds'],
-        'showConnectingResource' => true,
-    ];
-    
-    // Apply site setting filter if needed
-    if ($excludeResourcesNotInSite) {
-        $secondDegreeOptions['siteId'] = $this->currentSite()->id();
-    }
-    
-    // Get second-degree linked resources HTML output
-    $secondDegreeResources = $this->SecondDegreeResources($resource, $secondDegreeOptions);
-    
-    if ($secondDegreeResources): 
+    // Process each configuration separately
+    foreach ($templateConfigs as $configIndex => $config):
+        // Generate a unique ID for pagination purposes
+        $paginationId = "page_second_{$configIndex}";
+        
+        // Configure options for the second-degree resources
+        $secondDegreeOptions = array_merge($config, [
+            'page' => $this->params()->fromQuery($paginationId, 1),
+            'perPage' => 25,
+            'showConnectingResource' => true
+        ]);
+        
+        // Apply site setting filter if needed
+        if ($excludeResourcesNotInSite) {
+            $secondDegreeOptions['siteId'] = $this->currentSite()->id();
+        }
+        
+        // Get second-degree linked resources HTML output
+        $secondDegreeResources = $this->SecondDegreeResources($resource, $secondDegreeOptions);
+        
+        if ($secondDegreeResources): 
 ?>
-<div id="second-degree-resources-linked">
+<div id="second-degree-resources-linked-<?php echo $configIndex; ?>" class="second-degree-resources-linked">
     <h3><?php echo $this->translate($config['title']); ?></h3>
     <?php echo $secondDegreeResources; ?>
 </div>
 <?php 
-    endif;
+        endif;
+    endforeach;
 endif;
 ?>

@@ -8,11 +8,9 @@ class SecondDegreeResources extends AbstractHelper
 {
     /**
      * Display resources that are linked from resources that link to the given resource
-     *
-     * For example:
-     * - Given an Organization (current resource)
-     * - Find Events (first degree) that reference this Organization using specified property IDs
-     * - Find People (second degree) that are referenced by those Events using specified property IDs
+     * Can operate in two modes:
+     * - Direct: Find resources (first degree) that reference current resource, then find resources (second degree) referenced BY those first degree resources
+     * - Reverse: Find resources (first degree) that reference current resource, then find resources (second degree) that reference those first degree resources
      *
      * @param \Omeka\Api\Representation\AbstractResourceEntityRepresentation $resource The resource to find second-degree connections for
      * @param array $options Options for filtering and display
@@ -36,8 +34,16 @@ class SecondDegreeResources extends AbstractHelper
         $secondDegreeResourceType = $options['secondDegreeResourceType'] ?? 'items';
         
         // Property IDs for filtering
-        $firstDegreePropertyIds = $options['firstDegreePropertyIds'] ?? []; // New option
-        $secondDegreePropertyIds = $options['secondDegreePropertyIds'] ?? []; // New option
+        $firstDegreePropertyIds = $options['firstDegreePropertyIds'] ?? [];
+        $secondDegreePropertyIds = $options['secondDegreePropertyIds'] ?? [];
+        
+        // Direction mode - 'direct' or 'reverse'
+        $direction = $options['direction'] ?? 'direct';
+        
+        // Debug info
+        echo "<!-- DEBUG SecondDegreeResources: direction=$direction, firstDegreeTemplate=$firstDegreeResourceTemplate, secondDegreeTemplate=$secondDegreeResourceTemplate -->";
+        echo "<!-- DEBUG FirstDegreePropertyIds: " . implode(',', $firstDegreePropertyIds) . " -->";
+        echo "<!-- DEBUG SecondDegreePropertyIds: " . implode(',', $secondDegreePropertyIds) . " -->";
         
         // Get first degree resources that link to the current resource
         $firstDegreeResources = $this->getFirstDegreeResources(
@@ -45,7 +51,7 @@ class SecondDegreeResources extends AbstractHelper
             $firstDegreeResourceType, 
             $firstDegreeResourceTemplate,
             $siteId,
-            $firstDegreePropertyIds // Pass property IDs
+            $firstDegreePropertyIds
         );
         
         if (empty($firstDegreeResources)) {
@@ -53,16 +59,42 @@ class SecondDegreeResources extends AbstractHelper
             return null;
         }
         
-        // Get the property links FROM the first degree resources (e.g., from Events TO People)
-        $secondDegreeData = $this->getSecondDegreeResourcesFromLinks(
-            $firstDegreeResources,
-            $secondDegreeResourceType,
-            $secondDegreeResourceTemplate,
-            $page,
-            $perPage,
-            $siteId,
-            $secondDegreePropertyIds // Pass property IDs
-        );
+        // Debug first degree resources
+        echo "<!-- DEBUG: Found " . count($firstDegreeResources) . " first degree resources -->";
+        if (!empty($firstDegreeResources)) {
+            foreach ($firstDegreeResources as $index => $res) {
+                echo "<!-- DEBUG: First degree #$index: ID=" . $res->id() . ", Title='" . 
+                     htmlspecialchars($res->displayTitle()) . "' -->";
+            }
+        }
+        
+        // Get second degree resources based on direction
+        $secondDegreeData = [];
+        if ($direction === 'direct') {
+            echo "<!-- DEBUG: Using DIRECT mode for second degree resources -->";
+            // Direct mode: Find resources referenced BY the first degree resources
+            $secondDegreeData = $this->getSecondDegreeResourcesFromLinks(
+                $firstDegreeResources,
+                $secondDegreeResourceType,
+                $secondDegreeResourceTemplate,
+                $page,
+                $perPage,
+                $siteId,
+                $secondDegreePropertyIds
+            );
+        } else {
+            echo "<!-- DEBUG: Using REVERSE mode for second degree resources -->";
+            // Reverse mode: Find resources that reference the first degree resources
+            $secondDegreeData = $this->getSecondDegreeResourcesReferringToLinks(
+                $firstDegreeResources,
+                $secondDegreeResourceType,
+                $secondDegreeResourceTemplate,
+                $page,
+                $perPage,
+                $siteId,
+                $secondDegreePropertyIds
+            );
+        }
         
         if (empty($secondDegreeData['resources'])) {
             // No second degree resources found
@@ -121,7 +153,6 @@ class SecondDegreeResources extends AbstractHelper
     /**
      * Get resources of a specific type and template that link to the current resource
      * These are the first-degree connections (e.g., Events that reference an Organization)
-     * Now filtered by specific property IDs
      */
     protected function getFirstDegreeResources($resource, $resourceType, $templateId = null, $siteId = null, $propertyIds = [])
     {
@@ -189,8 +220,8 @@ class SecondDegreeResources extends AbstractHelper
     }
     
     /**
-     * Get resources that are linked FROM the first degree resources
-     * Now filtered by specific property IDs for second degree connections
+     * Get resources that are linked FROM the first degree resources (Direct mode)
+     * This is the original implementation renamed for clarity
      */
     protected function getSecondDegreeResourcesFromLinks($firstDegreeResources, $resourceType, $templateId = null, 
                                                       $page = null, $perPage = null, $siteId = null, $propertyIds = [])
@@ -298,8 +329,124 @@ class SecondDegreeResources extends AbstractHelper
     }
     
     /**
+     * Get resources that link TO the first degree resources (Reverse mode)
+     * This is the new method for reverse second degree relationships
+     */
+    protected function getSecondDegreeResourcesReferringToLinks($firstDegreeResources, $resourceType, $templateId = null, 
+                                                             $page = null, $perPage = null, $siteId = null, $propertyIds = [])
+    {
+        $view = $this->getView();
+        $api = $view->api();
+        
+        echo "<!-- DEBUG Reverse: Starting with " . count($firstDegreeResources) . " first degree resources -->";
+        
+        // Store all unique second degree resources
+        $allSecondDegreeResources = [];
+        $totalCount = 0;
+        $seen = []; // Track IDs we've already processed
+        
+        // For each first degree resource, find resources that link to it
+        foreach ($firstDegreeResources as $firstDegreeResource) {
+            $firstDegreeId = $firstDegreeResource->id();
+            
+            echo "<!-- DEBUG Reverse: Processing first degree resource ID=$firstDegreeId, Title='" . 
+                 htmlspecialchars($firstDegreeResource->displayTitle()) . "' -->";
+            
+            // For each specified property, search for resources that link to this first degree resource
+            foreach ($propertyIds as $propertyId) {
+                echo "<!-- DEBUG Reverse: Searching with property ID=$propertyId -->";
+                
+                // Query for resources that link to the first degree resource using this property
+                $query = [
+                    'property' => [
+                        [
+                            'property' => $propertyId,
+                            'type' => 'res',
+                            'text' => $firstDegreeId
+                        ]
+                    ]
+                ];
+                
+                // Add template filter if specified
+                if ($templateId) {
+                    $query['resource_template_id'] = $templateId;
+                    echo "<!-- DEBUG Reverse: Filtering by template ID=$templateId -->";
+                }
+                
+                // Add site filter if specified
+                if ($siteId) {
+                    $query['site_id'] = $siteId;
+                    echo "<!-- DEBUG Reverse: Filtering by site ID=$siteId -->";
+                }
+                
+                echo "<!-- DEBUG Reverse: Full query: " . json_encode($query) . " -->";
+                
+                // Execute API query
+                try {
+                    $response = $api->search($resourceType, $query);
+                    $resultCount = $response->getTotalResults();
+                    echo "<!-- DEBUG Reverse: Query returned $resultCount results -->";
+                    
+                    foreach ($response->getContent() as $linkedResource) {
+                        $resourceId = $linkedResource->id();
+                        
+                        echo "<!-- DEBUG Reverse: Found linked resource ID=$resourceId, Title='" . 
+                             htmlspecialchars($linkedResource->displayTitle()) . "' -->";
+                        
+                        // Skip if we've already seen this resource
+                        if (isset($seen[$resourceId])) {
+                            echo "<!-- DEBUG Reverse: Skipping duplicate resource ID=$resourceId -->";
+                            continue;
+                        }
+                        
+                        $seen[$resourceId] = true;
+                        $totalCount++;
+                        
+                        // Get the property for context
+                        $property = null;
+                        try {
+                            $property = $api->read('properties', ['id' => $propertyId])->getContent();
+                        } catch (\Exception $e) {
+                            echo "<!-- DEBUG Reverse: Error reading property ID=$propertyId: " . 
+                                 htmlspecialchars($e->getMessage()) . " -->";
+                            // Property not found, continue anyway
+                        }
+                        
+                        $allSecondDegreeResources[] = [
+                            'resource' => $linkedResource,
+                            'property' => $property,
+                            'connectingResource' => $firstDegreeResource // Store the connecting resource for context
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    echo "<!-- DEBUG Reverse: Error in search: " . htmlspecialchars($e->getMessage()) . " -->";
+                    // Error in search, continue with next property
+                }
+                
+                // Try to get the property label for better debugging
+                try {
+                    $propInfo = $api->read('properties', ['id' => $propertyId])->getContent();
+                    echo "<!-- DEBUG Reverse: Property ID=$propertyId is '" . $propInfo->label() . "' (" . $propInfo->term() . ") -->";
+                } catch (\Exception $e) {
+                    echo "<!-- DEBUG Reverse: Couldn't get property label for ID=$propertyId -->";
+                }
+            }
+        }
+        
+        // Apply pagination if needed
+        if ($page !== null && $perPage !== null) {
+            $offset = ($page - 1) * $perPage;
+            $allSecondDegreeResources = array_slice($allSecondDegreeResources, $offset, $perPage);
+        }
+        
+        return [
+            'resources' => $allSecondDegreeResources,
+            'totalCount' => $totalCount
+        ];
+    }
+    
+    /**
      * Get specific properties by their IDs
-     * New method to fetch properties by ID
      */
     protected function getSpecificProperties($propertyIds)
     {
