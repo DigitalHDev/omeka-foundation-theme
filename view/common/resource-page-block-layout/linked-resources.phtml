@@ -42,7 +42,15 @@ $showSecondDegree = 1;
         'secondDegreeResourceType' => 'items',
         'firstDegreeTemplate' => 16, // Event template ID
         'secondDegreeTemplate' => 17, // Person template ID
-        'showConnectingResource' => true // Show which event connects the person to the organization
+        'showConnectingResource' => true, // Show which event connects the person to the organization
+        
+        // Define specific property IDs for the first degree relationship
+        // Replace these IDs with your actual property IDs that connect Organization -> Event
+        'firstDegreePropertyIds' => [13], // e.g., dcterms:relation, etc.
+        
+        // Define specific property IDs for the second degree relationship
+        // Replace these IDs with your actual property IDs that connect Event -> Person
+        'secondDegreePropertyIds' => [501]  // e.g., dcterms:contributor, etc.
     ];
     
     // Apply site setting filter if needed

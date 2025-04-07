@@ -11,8 +11,8 @@ class SecondDegreeResources extends AbstractHelper
      *
      * For example:
      * - Given an Organization (current resource)
-     * - Find Events (first degree) that reference this Organization
-     * - Find People (second degree) that are referenced by those Events
+     * - Find Events (first degree) that reference this Organization using specified property IDs
+     * - Find People (second degree) that are referenced by those Events using specified property IDs
      *
      * @param \Omeka\Api\Representation\AbstractResourceEntityRepresentation $resource The resource to find second-degree connections for
      * @param array $options Options for filtering and display
@@ -35,12 +35,17 @@ class SecondDegreeResources extends AbstractHelper
         $firstDegreeResourceType = $options['firstDegreeResourceType'] ?? 'items';
         $secondDegreeResourceType = $options['secondDegreeResourceType'] ?? 'items';
         
+        // Property IDs for filtering
+        $firstDegreePropertyIds = $options['firstDegreePropertyIds'] ?? []; // New option
+        $secondDegreePropertyIds = $options['secondDegreePropertyIds'] ?? []; // New option
+        
         // Get first degree resources that link to the current resource
         $firstDegreeResources = $this->getFirstDegreeResources(
             $resource, 
             $firstDegreeResourceType, 
             $firstDegreeResourceTemplate,
-            $siteId
+            $siteId,
+            $firstDegreePropertyIds // Pass property IDs
         );
         
         if (empty($firstDegreeResources)) {
@@ -55,7 +60,8 @@ class SecondDegreeResources extends AbstractHelper
             $secondDegreeResourceTemplate,
             $page,
             $perPage,
-            $siteId
+            $siteId,
+            $secondDegreePropertyIds // Pass property IDs
         );
         
         if (empty($secondDegreeData['resources'])) {
@@ -115,14 +121,21 @@ class SecondDegreeResources extends AbstractHelper
     /**
      * Get resources of a specific type and template that link to the current resource
      * These are the first-degree connections (e.g., Events that reference an Organization)
+     * Now filtered by specific property IDs
      */
-    protected function getFirstDegreeResources($resource, $resourceType, $templateId = null, $siteId = null)
+    protected function getFirstDegreeResources($resource, $resourceType, $templateId = null, $siteId = null, $propertyIds = [])
     {
         $view = $this->getView();
         $api = $view->api();
         
-        // Get subject values for the specific resource type
-        $subjectValueProperties = $this->getSubjectValueProperties($resource, $resourceType, $siteId);
+        // Get subject value properties filtered by provided property IDs
+        if (!empty($propertyIds)) {
+            // Use only specified property IDs
+            $subjectValueProperties = $this->getSpecificProperties($propertyIds);
+        } else {
+            // Fallback to all properties if none specified
+            $subjectValueProperties = $this->getSubjectValueProperties($resource, $resourceType, $siteId);
+        }
         
         if (empty($subjectValueProperties)) {
             return [];
@@ -177,13 +190,26 @@ class SecondDegreeResources extends AbstractHelper
     
     /**
      * Get resources that are linked FROM the first degree resources
-     * For example, find People referenced by Events
-     * This is different from the original approach which looked for resources linking TO the first degree
+     * Now filtered by specific property IDs for second degree connections
      */
-    protected function getSecondDegreeResourcesFromLinks($firstDegreeResources, $resourceType, $templateId = null, $page = null, $perPage = null, $siteId = null)
+    protected function getSecondDegreeResourcesFromLinks($firstDegreeResources, $resourceType, $templateId = null, 
+                                                      $page = null, $perPage = null, $siteId = null, $propertyIds = [])
     {
         $view = $this->getView();
         $api = $view->api();
+        
+        // Get property terms if property IDs are provided
+        $propertyTerms = [];
+        if (!empty($propertyIds)) {
+            foreach ($propertyIds as $propertyId) {
+                try {
+                    $property = $api->read('properties', ['id' => $propertyId])->getContent();
+                    $propertyTerms[] = $property->term();
+                } catch (\Exception $e) {
+                    // Property not found, continue
+                }
+            }
+        }
         
         // Store all unique second degree resources
         $allSecondDegreeResources = [];
@@ -196,6 +222,11 @@ class SecondDegreeResources extends AbstractHelper
             $values = $firstDegreeResource->values();
             
             foreach ($values as $term => $propertyValues) {
+                // Skip if we're filtering by property terms and this term isn't in the list
+                if (!empty($propertyTerms) && !in_array($term, $propertyTerms)) {
+                    continue;
+                }
+                
                 foreach ($propertyValues['values'] as $value) {
                     // Only process resource links
                     if ($value->type() !== 'resource') {
@@ -264,6 +295,32 @@ class SecondDegreeResources extends AbstractHelper
             'resources' => $allSecondDegreeResources,
             'totalCount' => $totalCount
         ];
+    }
+    
+    /**
+     * Get specific properties by their IDs
+     * New method to fetch properties by ID
+     */
+    protected function getSpecificProperties($propertyIds)
+    {
+        $view = $this->getView();
+        $api = $view->api();
+        
+        $properties = [];
+        
+        foreach ($propertyIds as $propertyId) {
+            try {
+                $response = $api->read('properties', ['id' => $propertyId]);
+                $property = $response->getContent();
+                $properties[] = [
+                    'property' => $property
+                ];
+            } catch (\Exception $e) {
+                // Property not found, continue
+            }
+        }
+        
+        return $properties;
     }
     
     /**
