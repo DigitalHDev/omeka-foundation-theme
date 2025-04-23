@@ -2,7 +2,7 @@
 // Standard linked resources (first-degree)
 $options = [
     'page' => $this->params()->fromQuery('page', 1),
-    'perPage' => 25,
+    'perPage' => 200,
     'resourceProperty' => $this->params()->fromQuery('resource_property')
 ];
 
@@ -28,7 +28,7 @@ if ($resource->resourceTemplate()) {
 
 <?php if ($standardLinkedResources): ?>
 <div id="resources-linked">
-    <h3><?php echo $this->translate('Linked Resources'); ?></h3>
+    <!--<h3><?php echo $this->translate('Linked Resources'); ?></h3>-->
     <?php echo $standardLinkedResources; ?>
 </div>
 <?php endif; ?>
@@ -41,18 +41,18 @@ $secondDegreeConfigs = [
     18 => [
         // Direct connection configuration
         [
-            'title' => 'People Who Participated in Events at This Organization',
+            'title' => 'People in Events',
             'firstDegreeResourceType' => 'items',
             'secondDegreeResourceType' => 'items',
             'firstDegreeTemplate' => 16, // Event template ID
             'secondDegreeTemplate' => 17, // Person template ID
             'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
-            'secondDegreePropertyIds' => [501], // Properties connecting Event -> Person
+            'secondDegreePropertyIds' => [501, 502, 518, 511, 514, 503, 500, 506, 504], // Properties connecting Event -> Person
             'direction' => 'direct'
         ],
         // Reverse connection configuration
         [
-            'title' => 'Documents Associated with Events at This Organization',
+            'title' => 'Documents from Events',
             'firstDegreeResourceType' => 'items',
             'secondDegreeResourceType' => 'items',
             'firstDegreeTemplate' => 16, // Event template ID
@@ -66,7 +66,7 @@ $secondDegreeConfigs = [
     17 => [
         // Reverse connection configuration
         [
-            'title' => 'Documents belonging to Events Participated In',
+            'title' => 'Documents from Events',
             'firstDegreeResourceType' => 'items',
             'secondDegreeResourceType' => 'items',
             'firstDegreeTemplate' => 16, // Research Activity template ID
@@ -92,7 +92,7 @@ if ($showSecondDegree && $currentTemplateId && isset($secondDegreeConfigs[$curre
         // Configure options for the second-degree resources
         $secondDegreeOptions = array_merge($config, [
             'page' => $this->params()->fromQuery($paginationId, 1),
-            'perPage' => 25,
+            'perPage' => 200,
             'showConnectingResource' => true
         ]);
         

@@ -119,9 +119,9 @@ $sortHeadings = [
     </div>
 
     <div class="item-set-items">
-    <?php echo '<h3>' . $escape($templateName ?: $translate('Items'), 2) . '</h3>'; ?>
+    <?php echo '<h3>' . $escape($translate($templateName) ?: $translate('Items'), 2) . '</h3>'; ?>
 <?php else: ?>
-    <?php echo $this->pageTitle($templateName ?: $translate('Items'), 2); ?>
+    <?php echo $this->pageTitle($translate($templateName) ?: $translate('Items'), 2); ?>
 <?php endif; ?>
 
 <?php /*echo $this->searchFilters(); */?>

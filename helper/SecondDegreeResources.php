@@ -101,38 +101,96 @@ class SecondDegreeResources extends AbstractHelper
             return null;
         }
         
-        // Generate HTML directly for the linked resources
-        $html = '<div class="subject-values">';
-        $html .= '<div class="values">';
+        // Check if we should use semicolon-separated list for People (template ID 17)
+        $useCommaList = ($secondDegreeResourceTemplate == 17);
         
-        foreach ($secondDegreeData['resources'] as $resourceData) {
-            $linkedResource = $resourceData['resource'];
-            $connectingResource = $resourceData['connectingResource'] ?? null;
+        if ($useCommaList) {
+            // Generate comma-separated list for People
+            $html = '<div class="subject-values">';
+            $html .= '<div class="values semicolon-list">';
             
-            $html .= '<div class="value">';
+            $links = [];
+            $uniqueCombinations = []; // Track unique resource+property combinations
             
-            // Add the resource link
-            if (method_exists($linkedResource, 'linkPretty')) {
-                // Use built-in method if available
-                $html .= $linkedResource->linkPretty();
-            } else {
-                // Fallback to a simple link
-                $html .= '<a href="' . $view->escapeHtml($linkedResource->url()) . '">' 
-                       . $view->escapeHtml($linkedResource->displayTitle()) . '</a>';
+            foreach ($secondDegreeData['resources'] as $resourceData) {
+                $linkedResource = $resourceData['resource'];
+                $property = $resourceData['property'] ?? null;
+                
+                // Create a unique key for this resource+property combination
+                $resourceId = $linkedResource->id();
+                $propertyId = $property ? $property->id() : 'null';
+                $uniqueKey = $resourceId . '-' . $propertyId;
+                
+                // Skip if we've already seen this combination
+                if (isset($uniqueCombinations[$uniqueKey])) {
+                    continue;
+                }
+                
+                // Mark this combination as seen
+                $uniqueCombinations[$uniqueKey] = true;
+                
+                // Create link with property label in parentheses
+                $linkText = $view->escapeHtml($linkedResource->displayTitle());
+                
+                // Add property name in parentheses if available - make it translatable
+                if ($property) {
+                    // Use translate helper for property label
+                    $propertyLabel = $view->translate($property->label());
+                    $linkText .= ' (' . $view->escapeHtml($propertyLabel) . ')';
+                }
+                
+                $links[] = '<a href="' . $view->escapeHtml($linkedResource->url()) . '">' 
+                       . $linkText . '</a>';
             }
             
-            // Optionally show which first-degree resource connects them
-            if ($connectingResource && isset($options['showConnectingResource']) && $options['showConnectingResource']) {
-                $html .= ' <span class="connecting-resource">(via ';
-                $html .= '<a href="' . $view->escapeHtml($connectingResource->url()) . '">' 
-                       . $view->escapeHtml($connectingResource->displayTitle()) . '</a>';
-                $html .= ')</span>';
+            // Join links with semicolons
+            $html .= implode('; ', $links);
+            $html .= '</div>'; // close values
+        } else {
+            // Original div-based display for other templates
+            $html = '<div class="subject-values">';
+            $html .= '<div class="values">';
+            
+            $uniqueResources = []; // Track unique resources
+            
+            foreach ($secondDegreeData['resources'] as $resourceData) {
+                $linkedResource = $resourceData['resource'];
+                $connectingResource = $resourceData['connectingResource'] ?? null;
+                
+                // Skip if we've already seen this resource
+                $resourceId = $linkedResource->id();
+                if (isset($uniqueResources[$resourceId])) {
+                    continue;
+                }
+                
+                // Mark this resource as seen
+                $uniqueResources[$resourceId] = true;
+                
+                $html .= '<div class="value">';
+                
+                // Add the resource link
+                if (method_exists($linkedResource, 'linkPretty')) {
+                    // Use built-in method if available
+                    $html .= $linkedResource->linkPretty();
+                } else {
+                    // Fallback to a simple link
+                    $html .= '<a href="' . $view->escapeHtml($linkedResource->url()) . '">' 
+                           . $view->escapeHtml($linkedResource->displayTitle()) . '</a>';
+                }
+                
+                //// Optionally show which first-degree resource connects them
+                //if ($connectingResource && isset($options['showConnectingResource']) && $options['showConnectingResource']) {
+                //    $html .= ' <span class="connecting-resource">(via ';
+                //    $html .= '<a href="' . $view->escapeHtml($connectingResource->url()) . '">' 
+                //           . $view->escapeHtml($connectingResource->displayTitle()) . '</a>';
+                //    $html .= ')</span>';
+                //}
+                
+                $html .= '</div>';
             }
             
-            $html .= '</div>';
+            $html .= '</div>'; // close values
         }
-        
-        $html .= '</div>'; // close values
         
         // Add pagination if needed
         if ($page !== null && $perPage !== null && $secondDegreeData['totalCount'] > $perPage) {
@@ -231,11 +289,14 @@ class SecondDegreeResources extends AbstractHelper
         
         // Get property terms if property IDs are provided
         $propertyTerms = [];
+        $propertyMap = []; // Map property terms to property objects for later use
         if (!empty($propertyIds)) {
             foreach ($propertyIds as $propertyId) {
                 try {
                     $property = $api->read('properties', ['id' => $propertyId])->getContent();
-                    $propertyTerms[] = $property->term();
+                    $term = $property->term();
+                    $propertyTerms[] = $term;
+                    $propertyMap[$term] = $property; // Store property object by term
                 } catch (\Exception $e) {
                     // Property not found, continue
                 }
@@ -256,6 +317,18 @@ class SecondDegreeResources extends AbstractHelper
                 // Skip if we're filtering by property terms and this term isn't in the list
                 if (!empty($propertyTerms) && !in_array($term, $propertyTerms)) {
                     continue;
+                }
+                
+                // Get the property object for this term
+                $property = $propertyMap[$term] ?? null;
+                if (!$property && !empty($propertyTerms)) {
+                    // Try to load property if not in map
+                    try {
+                        $propertyResponse = $api->read('properties', ['term' => $term]);
+                        $property = $propertyResponse->getContent();
+                    } catch (\Exception $e) {
+                        // Property not found, continue anyway
+                    }
                 }
                 
                 foreach ($propertyValues['values'] as $value) {
@@ -289,23 +362,16 @@ class SecondDegreeResources extends AbstractHelper
                     }
                     
                     $resourceId = $linkedResource->id();
+                    $propertyId = $property ? $property->id() : 'null';
+                    $uniqueKey = $resourceId . '-' . $propertyId;
                     
-                    // Skip if we've already seen this resource
-                    if (isset($seen[$resourceId])) {
+                    // Skip if we've already seen this resource-property combination
+                    if (isset($seen[$uniqueKey])) {
                         continue;
                     }
                     
-                    $seen[$resourceId] = true;
+                    $seen[$uniqueKey] = true;
                     $totalCount++;
-                    
-                    // Find the property representation for the current term
-                    $property = null;
-                    try {
-                        $propertyResponse = $api->read('properties', ['term' => $term]);
-                        $property = $propertyResponse->getContent();
-                    } catch (\Exception $e) {
-                        // Property not found, continue anyway
-                    }
                     
                     $allSecondDegreeResources[] = [
                         'resource' => $linkedResource,
@@ -343,7 +409,19 @@ class SecondDegreeResources extends AbstractHelper
         // Store all unique second degree resources
         $allSecondDegreeResources = [];
         $totalCount = 0;
-        $seen = []; // Track IDs we've already processed
+        $seen = []; // Track resource-property combinations we've already processed
+        
+        // Create a map of property IDs to property objects for quicker lookup
+        $propertyMap = [];
+        foreach ($propertyIds as $propertyId) {
+            try {
+                $property = $api->read('properties', ['id' => $propertyId])->getContent();
+                $propertyMap[$propertyId] = $property;
+            } catch (\Exception $e) {
+                echo "<!-- DEBUG Reverse: Error loading property ID=$propertyId: " . 
+                     htmlspecialchars($e->getMessage()) . " -->";
+            }
+        }
         
         // For each first degree resource, find resources that link to it
         foreach ($firstDegreeResources as $firstDegreeResource) {
@@ -355,6 +433,9 @@ class SecondDegreeResources extends AbstractHelper
             // For each specified property, search for resources that link to this first degree resource
             foreach ($propertyIds as $propertyId) {
                 echo "<!-- DEBUG Reverse: Searching with property ID=$propertyId -->";
+                
+                // Get the property object for this ID
+                $property = $propertyMap[$propertyId] ?? null;
                 
                 // Query for resources that link to the first degree resource using this property
                 $query = [
@@ -389,28 +470,20 @@ class SecondDegreeResources extends AbstractHelper
                     
                     foreach ($response->getContent() as $linkedResource) {
                         $resourceId = $linkedResource->id();
+                        $propertyId = $property ? $property->id() : 'null';
+                        $uniqueKey = $resourceId . '-' . $propertyId;
                         
                         echo "<!-- DEBUG Reverse: Found linked resource ID=$resourceId, Title='" . 
                              htmlspecialchars($linkedResource->displayTitle()) . "' -->";
                         
-                        // Skip if we've already seen this resource
-                        if (isset($seen[$resourceId])) {
-                            echo "<!-- DEBUG Reverse: Skipping duplicate resource ID=$resourceId -->";
+                        // Skip if we've already seen this resource-property combination
+                        if (isset($seen[$uniqueKey])) {
+                            echo "<!-- DEBUG Reverse: Skipping duplicate resource-property combination ID=$resourceId, PropertyID=$propertyId -->";
                             continue;
                         }
                         
-                        $seen[$resourceId] = true;
+                        $seen[$uniqueKey] = true;
                         $totalCount++;
-                        
-                        // Get the property for context
-                        $property = null;
-                        try {
-                            $property = $api->read('properties', ['id' => $propertyId])->getContent();
-                        } catch (\Exception $e) {
-                            echo "<!-- DEBUG Reverse: Error reading property ID=$propertyId: " . 
-                                 htmlspecialchars($e->getMessage()) . " -->";
-                            // Property not found, continue anyway
-                        }
                         
                         $allSecondDegreeResources[] = [
                             'resource' => $linkedResource,
@@ -424,10 +497,9 @@ class SecondDegreeResources extends AbstractHelper
                 }
                 
                 // Try to get the property label for better debugging
-                try {
-                    $propInfo = $api->read('properties', ['id' => $propertyId])->getContent();
-                    echo "<!-- DEBUG Reverse: Property ID=$propertyId is '" . $propInfo->label() . "' (" . $propInfo->term() . ") -->";
-                } catch (\Exception $e) {
+                if ($property) {
+                    echo "<!-- DEBUG Reverse: Property ID=$propertyId is '" . $property->label() . "' (" . $property->term() . ") -->";
+                } else {
                     echo "<!-- DEBUG Reverse: Couldn't get property label for ID=$propertyId -->";
                 }
             }
