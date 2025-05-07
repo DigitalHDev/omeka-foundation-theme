@@ -1,0 +1,88 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\gilsh\\source\\repos\\omeka-foundation-theme\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\gilsh\\source\\repos\\omeka-foundation-theme\\view\\common\\block-template\\mediaembeds-with-notice.phtml||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:view\\common\\block-template\\mediaembeds-with-notice.phtml||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\gilsh\\source\\repos\\omeka-foundation-theme\\config\\theme.ini||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:config\\theme.ini||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 116,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:131:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "mediaembeds-with-notice.phtml",
+              "DocumentMoniker": "C:\\Users\\gilsh\\source\\repos\\omeka-foundation-theme\\view\\common\\block-template\\mediaembeds-with-notice.phtml",
+              "RelativeDocumentMoniker": "view\\common\\block-template\\mediaembeds-with-notice.phtml",
+              "ToolTip": "C:\\Users\\gilsh\\source\\repos\\omeka-foundation-theme\\view\\common\\block-template\\mediaembeds-with-notice.phtml",
+              "RelativeToolTip": "view\\common\\block-template\\mediaembeds-with-notice.phtml",
+              "ViewState": "AgIAACAAAAAAAAAAAAAYwDsAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-05-07T12:23:04.507Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "theme.ini",
+              "DocumentMoniker": "C:\\Users\\gilsh\\source\\repos\\omeka-foundation-theme\\config\\theme.ini",
+              "RelativeDocumentMoniker": "config\\theme.ini",
+              "ToolTip": "C:\\Users\\gilsh\\source\\repos\\omeka-foundation-theme\\config\\theme.ini",
+              "RelativeToolTip": "config\\theme.ini",
+              "ViewState": "AgIAALkAAAAAAAAAAAAnwNQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002768|",
+              "WhenOpened": "2025-05-07T12:06:31.903Z",
+              "EditorCaption": ""
+            }
+          ]
+        },
+        {
+          "DockedWidth": 259,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{eefa5220-e298-11d0-8f78-00a0c9110057}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\asset",
+    "\\asset\\scss",
+    "\\helper",
+    "\\view",
+    "\\view\\common",
+    "\\view\\common\\resource-page-block-layout",
+    "\\view\\omeka",
+    "\\view\\omeka\\site",
+    "\\view\\omeka\\site\\item"
+  ],
+  "PreviewInSolutionExplorer": false
+}
