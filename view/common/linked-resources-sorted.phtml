@@ -1,0 +1,128 @@
+<?php
+/**
+ * @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $objectResource
+ * @var array $subjectValues
+ * @var int $totalCount
+ * @var int|null $page
+ * @var int|null $perPage
+ * @var string|null $resourceProperty
+ * @var int|null $propertyId
+ * @var string|null $resourceType
+ * @var array|null $resourcePropertiesAll
+ */
+
+// Helper function to extract date value from a subject resource
+function getDateValue($resource)
+{
+    try {
+        // Try to get dcterms:date property
+        $dateValue = $resource->value('dcterms:date');
+        if ($dateValue) {
+            // Get the actual value
+            if (is_object($dateValue)) {
+                $valueText = $dateValue->value();
+                
+                // If it's a literal value, return it for sorting
+                if (method_exists($dateValue, 'type') && $dateValue->type() === 'literal') {
+                    return $valueText;
+                }
+                
+                // For other types, try to extract meaningful text
+                return $valueText ?? '';
+            }
+            return (string) $dateValue;
+        }
+    } catch (\Exception $e) {
+        // If there's any error, return empty string
+    }
+    
+    // If no date found, return a string that will sort last
+    return 'zzzzz_no_date';
+}
+
+// Sort all values across all properties by date
+// Each value array represents a subject resource
+$allValues = [];
+foreach ($subjectValues as $propertyName => $propertyValues) {
+    foreach ($propertyValues as $value) {
+        // The resource() method gives us the SUBJECT resource (the one pointing to the current resource)
+        $subjectResource = $value['val']->resource();
+        
+        if ($subjectResource) {
+            $allValues[] = [
+                'property_name' => $propertyName,
+                'value_array' => $value,
+                'subject_resource' => $subjectResource
+            ];
+        }
+    }
+}
+
+// Sort the combined values by date
+if ($allValues) {
+    usort($allValues, function($a, $b) {
+        $dateA = getDateValue($a['subject_resource']);
+        $dateB = getDateValue($b['subject_resource']);
+        
+        // Remove the 'zzzzz_no_date' marker for actual comparison
+        $dateA = $dateA === 'zzzzz_no_date' ? '' : $dateA;
+        $dateB = $dateB === 'zzzzz_no_date' ? '' : $dateB;
+        
+        // Handle empty dates - they should come last
+        if (empty($dateA) && empty($dateB)) return 0;
+        if (empty($dateA)) return 1;
+        if (empty($dateB)) return -1;
+        
+        // Convert to timestamps for proper date comparison
+        $timestampA = strtotime($dateA);
+        $timestampB = strtotime($dateB);
+        
+        // If strtotime fails, fall back to string comparison
+        if ($timestampA === false || $timestampB === false) {
+            return strcmp($dateA, $dateB);
+        }
+        
+        // Sort in ascending order (oldest first)
+        return $timestampA - $timestampB;
+    });
+}
+
+// Now render the sorted results
+?>
+
+<?php if ($allValues): ?>
+<div class="property">
+    <?php if ($resourcePropertiesAll && is_array($resourcePropertiesAll) && count($resourcePropertiesAll) > 1): ?>
+    <select class="resource-property-select" aria-label="<?php echo $this->translate('Filter by property'); ?>">
+        <?php foreach ($resourcePropertiesAll as $type => $typeProperties): ?>
+        <?php if (is_array($typeProperties)): ?>
+        <?php foreach ($typeProperties as $typeProperty): ?>
+        <?php if (is_object($typeProperty) && method_exists($typeProperty, 'id') && method_exists($typeProperty, 'label')): ?>
+        <?php
+        $typePropertyValue = sprintf('%s:%s', $type, $typeProperty->id());
+        $typePropertyText = sprintf('%s: %s', $this->translate(ucfirst($type)), $this->translate($typeProperty->label()));
+        ?>
+        <option value="<?php echo $this->escapeHtml($typePropertyValue); ?>" <?php echo $typePropertyValue === $resourceProperty ? 'selected' : ''; ?>><?php echo $typePropertyText; ?></option>
+        <?php endif; ?>
+        <?php endforeach; ?>
+        <?php endif; ?>
+        <?php endforeach; ?>
+    </select>
+    <?php endif; ?>
+    
+    <div class="values">
+        <ul class="resource-list">
+            <?php foreach ($allValues as $item): ?>
+            <?php
+            $valueArray = $item['value_array'];
+            $propertyName = $item['property_name'];
+            $resource = $item['subject_resource'];
+            ?>
+            <li class="resource-list-item">
+                <?php echo $resource->linkPretty(); ?>
+            </li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+</div>
+<?php endif; ?>

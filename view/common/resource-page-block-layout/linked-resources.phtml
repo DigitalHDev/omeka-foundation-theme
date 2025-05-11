@@ -3,7 +3,8 @@
 $options = [
     'page' => $this->params()->fromQuery('page', 1),
     'perPage' => 200,
-    'resourceProperty' => $this->params()->fromQuery('resource_property')
+    'resourceProperty' => $this->params()->fromQuery('resource_property'),
+    'viewName' => 'common/linked-resources-sorted' // Use our custom view to sort according to 'date'
 ];
 
 // Site setting check - apply to all queries
@@ -13,6 +14,7 @@ if ($excludeResourcesNotInSite) {
 }
 
 // Get standard linked resources HTML output
+// displaySubjectValues is in /var/www/html/application/src/Api/Representation/AbstractResourceEntityRepresentation.php
 $standardLinkedResources = $resource->displaySubjectValues($options);
 
 // Check if we should show second-degree resources
