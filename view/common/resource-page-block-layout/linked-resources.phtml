@@ -62,6 +62,17 @@ $secondDegreeConfigs = [
             'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
             'secondDegreePropertyIds' => [13], // Properties connecting Document -> Event
             'direction' => 'reverse'
+        ],
+        // Reverse connection configuration
+        [
+            'title' => 'Photographs from Events',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 20, // Photograph template ID
+            'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Photograph -> Event
+            'direction' => 'reverse'
         ]
     ],
     // Person template (ID: 17)
@@ -71,10 +82,21 @@ $secondDegreeConfigs = [
             'title' => 'Documents from Events',
             'firstDegreeResourceType' => 'items',
             'secondDegreeResourceType' => 'items',
-            'firstDegreeTemplate' => 16, // Research Activity template ID
-            'secondDegreeTemplate' => 15, // Grant template ID
-            'firstDegreePropertyIds' => [501], // Properties connecting Project -> Research Activity
-            'secondDegreePropertyIds' => [13], // Properties connecting Grant -> Research Activity
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 15, // Document template ID
+            'firstDegreePropertyIds' => [501], // Properties connecting Person -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Document -> Event
+            'direction' => 'reverse'
+        ],
+        // Reverse connection configuration
+        [
+            'title' => 'Photographs from Events',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 20, // Photograph template ID
+            'firstDegreePropertyIds' => [501], // Properties connecting Person -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Photograph -> Event
             'direction' => 'reverse'
         ]
     ]
