@@ -21,6 +21,8 @@ class SecondDegreeResources extends AbstractHelper
         $view = $this->getView();
         
         // Set default options
+        $page = $options['page'] ?? null;
+        $perPage = $options['perPage'] ?? null;
         $siteId = $options['siteId'] ?? (isset($view->site) ? $view->site->id() : null);
         
         // Template filters
@@ -38,6 +40,11 @@ class SecondDegreeResources extends AbstractHelper
         // Direction mode - 'direct' or 'reverse'
         $direction = $options['direction'] ?? 'direct';
         
+        // Debug info
+        echo "<!-- DEBUG SecondDegreeResources: direction=$direction, firstDegreeTemplate=$firstDegreeResourceTemplate, secondDegreeTemplate=$secondDegreeResourceTemplate -->";
+        echo "<!-- DEBUG FirstDegreePropertyIds: " . implode(',', $firstDegreePropertyIds) . " -->";
+        echo "<!-- DEBUG SecondDegreePropertyIds: " . implode(',', $secondDegreePropertyIds) . " -->";
+        
         // Get first degree resources that link to the current resource
         $firstDegreeResources = $this->getFirstDegreeResources(
             $resource, 
@@ -52,23 +59,38 @@ class SecondDegreeResources extends AbstractHelper
             return null;
         }
         
+        // Debug first degree resources
+        echo "<!-- DEBUG: Found " . count($firstDegreeResources) . " first degree resources -->";
+        if (!empty($firstDegreeResources)) {
+            foreach ($firstDegreeResources as $index => $res) {
+                echo "<!-- DEBUG: First degree #$index: ID=" . $res->id() . ", Title='" . 
+                     htmlspecialchars($res->displayTitle()) . "' -->";
+            }
+        }
+        
         // Get second degree resources based on direction
         $secondDegreeData = [];
         if ($direction === 'direct') {
+            echo "<!-- DEBUG: Using DIRECT mode for second degree resources -->";
             // Direct mode: Find resources referenced BY the first degree resources
             $secondDegreeData = $this->getSecondDegreeResourcesFromLinks(
                 $firstDegreeResources,
                 $secondDegreeResourceType,
                 $secondDegreeResourceTemplate,
+                $page,
+                $perPage,
                 $siteId,
                 $secondDegreePropertyIds
             );
         } else {
+            echo "<!-- DEBUG: Using REVERSE mode for second degree resources -->";
             // Reverse mode: Find resources that reference the first degree resources
             $secondDegreeData = $this->getSecondDegreeResourcesReferringToLinks(
                 $firstDegreeResources,
                 $secondDegreeResourceType,
                 $secondDegreeResourceTemplate,
+                $page,
+                $perPage,
                 $siteId,
                 $secondDegreePropertyIds
             );
@@ -79,69 +101,50 @@ class SecondDegreeResources extends AbstractHelper
             return null;
         }
         
-        // Check if we should use nested list format for People (template ID 17)
-        $useNestedList = ($secondDegreeResourceTemplate == 17);
+        // Check if we should use semicolon-separated list for People (template ID 17)
+        $useCommaList = ($secondDegreeResourceTemplate == 17);
         
-        if ($useNestedList) {
-            // Generate nested list for People, grouped by property
+        if ($useCommaList) {
+            // Generate comma-separated list for People
             $html = '<div class="subject-values">';
-            $html .= '<div class="values nested-list">';
+            $html .= '<div class="values semicolon-list">';
             
-            // Group resources by property
-            $resourcesByProperty = [];
+            $links = [];
+            $uniqueCombinations = []; // Track unique resource+property combinations
             
             foreach ($secondDegreeData['resources'] as $resourceData) {
                 $linkedResource = $resourceData['resource'];
                 $property = $resourceData['property'] ?? null;
                 
-                if (!$property) {
-                    // Skip resources without properties
+                // Create a unique key for this resource+property combination
+                $resourceId = $linkedResource->id();
+                $propertyId = $property ? $property->id() : 'null';
+                $uniqueKey = $resourceId . '-' . $propertyId;
+                
+                // Skip if we've already seen this combination
+                if (isset($uniqueCombinations[$uniqueKey])) {
                     continue;
                 }
                 
-                $resourceId = $linkedResource->id();
-                $propertyId = $property->id();
-                $propertyLabel = $view->translate($property->label());
+                // Mark this combination as seen
+                $uniqueCombinations[$uniqueKey] = true;
                 
-                // Initialize property group if not exists
-                if (!isset($resourcesByProperty[$propertyLabel])) {
-                    $resourcesByProperty[$propertyLabel] = [
-                        'property' => $property,
-                        'resources' => []
-                    ];
+                // Create link with property label in parentheses
+                $linkText = $view->escapeHtml($linkedResource->displayTitle());
+                
+                // Add property name in parentheses if available - make it translatable
+                if ($property) {
+                    // Use translate helper for property label
+                    $propertyLabel = $view->translate($property->label());
+                    $linkText .= ' (' . $view->escapeHtml($propertyLabel) . ')';
                 }
                 
-                // Add resource if not already present
-                $resourcesByProperty[$propertyLabel]['resources'][$resourceId] = $linkedResource;
+                $links[] = '<a href="' . $view->escapeHtml($linkedResource->url()) . '">' 
+                       . $linkText . '</a>';
             }
             
-            // Sort properties alphabetically
-            ksort($resourcesByProperty);
-            
-            // Build the nested HTML structure
-            foreach ($resourcesByProperty as $propertyLabel => $data) {
-                $html .= '<div class="property-group">';
-                $html .= '<h4 class="property-name">' . $view->escapeHtml($propertyLabel) . '</h4>';
-                $html .= '<ul class="people-list">';
-                
-                // Sort people by display title
-                $resources = $data['resources'];
-                usort($resources, function($a, $b) {
-                    return strcmp($a->displayTitle(), $b->displayTitle());
-                });
-                
-                // Add each person as a list item
-                foreach ($resources as $linkedResource) {
-                    $html .= '<li>';
-                    $html .= '<a href="' . $view->escapeHtml($linkedResource->url()) . '">' 
-                           . $view->escapeHtml($linkedResource->displayTitle()) . '</a>';
-                    $html .= '</li>';
-                }
-                
-                $html .= '</ul>';
-                $html .= '</div>';
-            }
-            
+            // Join links with semicolons
+            $html .= implode('; ', $links);
             $html .= '</div>'; // close values
         } else {
             // Original div-based display for other templates
@@ -187,6 +190,17 @@ class SecondDegreeResources extends AbstractHelper
             }
             
             $html .= '</div>'; // close values
+        }
+        
+        // Add pagination if needed
+        if ($page !== null && $perPage !== null && $secondDegreeData['totalCount'] > $perPage) {
+            // Try to use the same pagination helper as Omeka
+            if (method_exists($view, 'pagination')) {
+                $paginationHtml = $view->pagination(null, $secondDegreeData['totalCount'], $page, $perPage);
+                if ($paginationHtml) {
+                    $html .= '<div class="pagination">' . $paginationHtml . '</div>';
+                }
+            }
         }
         
         $html .= '</div>'; // close subject-values
@@ -268,7 +282,7 @@ class SecondDegreeResources extends AbstractHelper
      * This is the original implementation renamed for clarity
      */
     protected function getSecondDegreeResourcesFromLinks($firstDegreeResources, $resourceType, $templateId = null, 
-                                                      $siteId = null, $propertyIds = [])
+                                                      $page = null, $perPage = null, $siteId = null, $propertyIds = [])
     {
         $view = $this->getView();
         $api = $view->api();
@@ -368,6 +382,12 @@ class SecondDegreeResources extends AbstractHelper
             }
         }
         
+        // Apply pagination if needed
+        if ($page !== null && $perPage !== null) {
+            $offset = ($page - 1) * $perPage;
+            $allSecondDegreeResources = array_slice($allSecondDegreeResources, $offset, $perPage);
+        }
+        
         return [
             'resources' => $allSecondDegreeResources,
             'totalCount' => $totalCount
@@ -379,10 +399,12 @@ class SecondDegreeResources extends AbstractHelper
      * This is the new method for reverse second degree relationships
      */
     protected function getSecondDegreeResourcesReferringToLinks($firstDegreeResources, $resourceType, $templateId = null, 
-                                                             $siteId = null, $propertyIds = [])
+                                                             $page = null, $perPage = null, $siteId = null, $propertyIds = [])
     {
         $view = $this->getView();
         $api = $view->api();
+        
+        echo "<!-- DEBUG Reverse: Starting with " . count($firstDegreeResources) . " first degree resources -->";
         
         // Store all unique second degree resources
         $allSecondDegreeResources = [];
@@ -396,7 +418,8 @@ class SecondDegreeResources extends AbstractHelper
                 $property = $api->read('properties', ['id' => $propertyId])->getContent();
                 $propertyMap[$propertyId] = $property;
             } catch (\Exception $e) {
-                // Property not found, continue
+                echo "<!-- DEBUG Reverse: Error loading property ID=$propertyId: " . 
+                     htmlspecialchars($e->getMessage()) . " -->";
             }
         }
         
@@ -404,8 +427,13 @@ class SecondDegreeResources extends AbstractHelper
         foreach ($firstDegreeResources as $firstDegreeResource) {
             $firstDegreeId = $firstDegreeResource->id();
             
+            echo "<!-- DEBUG Reverse: Processing first degree resource ID=$firstDegreeId, Title='" . 
+                 htmlspecialchars($firstDegreeResource->displayTitle()) . "' -->";
+            
             // For each specified property, search for resources that link to this first degree resource
             foreach ($propertyIds as $propertyId) {
+                echo "<!-- DEBUG Reverse: Searching with property ID=$propertyId -->";
+                
                 // Get the property object for this ID
                 $property = $propertyMap[$propertyId] ?? null;
                 
@@ -423,24 +451,34 @@ class SecondDegreeResources extends AbstractHelper
                 // Add template filter if specified
                 if ($templateId) {
                     $query['resource_template_id'] = $templateId;
+                    echo "<!-- DEBUG Reverse: Filtering by template ID=$templateId -->";
                 }
                 
                 // Add site filter if specified
                 if ($siteId) {
                     $query['site_id'] = $siteId;
+                    echo "<!-- DEBUG Reverse: Filtering by site ID=$siteId -->";
                 }
+                
+                echo "<!-- DEBUG Reverse: Full query: " . json_encode($query) . " -->";
                 
                 // Execute API query
                 try {
                     $response = $api->search($resourceType, $query);
+                    $resultCount = $response->getTotalResults();
+                    echo "<!-- DEBUG Reverse: Query returned $resultCount results -->";
                     
                     foreach ($response->getContent() as $linkedResource) {
                         $resourceId = $linkedResource->id();
                         $propertyId = $property ? $property->id() : 'null';
                         $uniqueKey = $resourceId . '-' . $propertyId;
                         
+                        echo "<!-- DEBUG Reverse: Found linked resource ID=$resourceId, Title='" . 
+                             htmlspecialchars($linkedResource->displayTitle()) . "' -->";
+                        
                         // Skip if we've already seen this resource-property combination
                         if (isset($seen[$uniqueKey])) {
+                            echo "<!-- DEBUG Reverse: Skipping duplicate resource-property combination ID=$resourceId, PropertyID=$propertyId -->";
                             continue;
                         }
                         
@@ -454,9 +492,23 @@ class SecondDegreeResources extends AbstractHelper
                         ];
                     }
                 } catch (\Exception $e) {
+                    echo "<!-- DEBUG Reverse: Error in search: " . htmlspecialchars($e->getMessage()) . " -->";
                     // Error in search, continue with next property
                 }
+                
+                // Try to get the property label for better debugging
+                if ($property) {
+                    echo "<!-- DEBUG Reverse: Property ID=$propertyId is '" . $property->label() . "' (" . $property->term() . ") -->";
+                } else {
+                    echo "<!-- DEBUG Reverse: Couldn't get property label for ID=$propertyId -->";
+                }
             }
+        }
+        
+        // Apply pagination if needed
+        if ($page !== null && $perPage !== null) {
+            $offset = ($page - 1) * $perPage;
+            $allSecondDegreeResources = array_slice($allSecondDegreeResources, $offset, $perPage);
         }
         
         return [
