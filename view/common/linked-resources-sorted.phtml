@@ -40,16 +40,33 @@ function getDateValue($resource)
     return 'zzzzz_no_date';
 }
 
-// Sort all values across all properties by date
-// Each value array represents a subject resource
-$allValues = [];
+// Group values by resource template
+$resourcesByTemplate = [];
+
+// Process all subject values
 foreach ($subjectValues as $propertyName => $propertyValues) {
     foreach ($propertyValues as $value) {
-        // The resource() method gives us the SUBJECT resource (the one pointing to the current resource)
+        // Get the subject resource (the one pointing to the current resource)
         $subjectResource = $value['val']->resource();
         
         if ($subjectResource) {
-            $allValues[] = [
+            // Get the template for this resource
+            $template = null;
+            $templateName = $this->translate('Other Resources');
+            
+            if ($subjectResource->resourceTemplate()) {
+                $template = $subjectResource->resourceTemplate();
+                // Make template name plural by adding 's' and use translate function
+                $templateName = $this->translate($template->label() . 's');
+            }
+            
+            // Initialize the array for this template if it doesn't exist
+            if (!isset($resourcesByTemplate[$templateName])) {
+                $resourcesByTemplate[$templateName] = [];
+            }
+            
+            // Add this resource to its template group
+            $resourcesByTemplate[$templateName][] = [
                 'property_name' => $propertyName,
                 'value_array' => $value,
                 'subject_resource' => $subjectResource
@@ -58,9 +75,9 @@ foreach ($subjectValues as $propertyName => $propertyValues) {
     }
 }
 
-// Sort the combined values by date
-if ($allValues) {
-    usort($allValues, function($a, $b) {
+// Sort each template group by date
+foreach ($resourcesByTemplate as $templateName => &$resources) {
+    usort($resources, function($a, $b) {
         $dateA = getDateValue($a['subject_resource']);
         $dateB = getDateValue($b['subject_resource']);
         
@@ -86,11 +103,9 @@ if ($allValues) {
         return $timestampA - $timestampB;
     });
 }
-
-// Now render the sorted results
 ?>
 
-<?php if ($allValues): ?>
+<?php if (!empty($resourcesByTemplate)): ?>
 <div class="property">
     <?php if ($resourcePropertiesAll && is_array($resourcePropertiesAll) && count($resourcePropertiesAll) > 1): ?>
     <select class="resource-property-select" aria-label="<?php echo $this->translate('Filter by property'); ?>">
@@ -111,18 +126,19 @@ if ($allValues) {
     <?php endif; ?>
     
     <div class="values">
-        <ul class="resource-list">
-            <?php foreach ($allValues as $item): ?>
-            <?php
-            $valueArray = $item['value_array'];
-            $propertyName = $item['property_name'];
-            $resource = $item['subject_resource'];
-            ?>
-            <li class="resource-list-item">
-                <?php echo $resource->linkPretty(); ?>
-            </li>
-            <?php endforeach; ?>
-        </ul>
+        <?php foreach ($resourcesByTemplate as $templateName => $resources): ?>
+            <h4 class="resource-template-heading"><?php echo $this->escapeHtml($templateName); ?></h4>
+            <ul class="resource-list">
+                <?php foreach ($resources as $item): ?>
+                <?php
+                $resource = $item['subject_resource'];
+                ?>
+                <li class="resource-list-item">
+                    <?php echo $resource->linkPretty(); ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endforeach; ?>
     </div>
 </div>
 <?php endif; ?>
