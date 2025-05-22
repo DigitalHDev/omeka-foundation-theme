@@ -40,10 +40,12 @@ function getDateValue($resource)
     return 'zzzzz_no_date';
 }
 
-// Group values by resource template
+// Two-level organization:
+// 1. First level: group by resource template
+// 2. Second level: group by property name that connects to the main resource
 $resourcesByTemplate = [];
 
-// Process all subject values
+// Process all subject values and organize by template first
 foreach ($subjectValues as $propertyName => $propertyValues) {
     foreach ($propertyValues as $value) {
         // Get the subject resource (the one pointing to the current resource)
@@ -65,7 +67,7 @@ foreach ($subjectValues as $propertyName => $propertyValues) {
                 $resourcesByTemplate[$templateName] = [];
             }
             
-            // Add this resource to its template group
+            // Add this resource to its template group, including the property name
             $resourcesByTemplate[$templateName][] = [
                 'property_name' => $propertyName,
                 'value_array' => $value,
@@ -75,37 +77,54 @@ foreach ($subjectValues as $propertyName => $propertyValues) {
     }
 }
 
-// Sort each template group by date
-foreach ($resourcesByTemplate as $templateName => &$resources) {
-    usort($resources, function($a, $b) {
-        $dateA = getDateValue($a['subject_resource']);
-        $dateB = getDateValue($b['subject_resource']);
+// Now organize each template group by connecting property
+$organizedTemplates = [];
+foreach ($resourcesByTemplate as $templateName => $resources) {
+    $organizedTemplates[$templateName] = [];
+    
+    // Group resources by property name
+    foreach ($resources as $resource) {
+        $propertyName = $resource['property_name'];
         
-        // Remove the 'zzzzz_no_date' marker for actual comparison
-        $dateA = $dateA === 'zzzzz_no_date' ? '' : $dateA;
-        $dateB = $dateB === 'zzzzz_no_date' ? '' : $dateB;
-        
-        // Handle empty dates - they should come last
-        if (empty($dateA) && empty($dateB)) return 0;
-        if (empty($dateA)) return 1;
-        if (empty($dateB)) return -1;
-        
-        // Convert to timestamps for proper date comparison
-        $timestampA = strtotime($dateA);
-        $timestampB = strtotime($dateB);
-        
-        // If strtotime fails, fall back to string comparison
-        if ($timestampA === false || $timestampB === false) {
-            return strcmp($dateA, $dateB);
+        if (!isset($organizedTemplates[$templateName][$propertyName])) {
+            $organizedTemplates[$templateName][$propertyName] = [];
         }
         
-        // Sort in ascending order (oldest first)
-        return $timestampA - $timestampB;
-    });
+        $organizedTemplates[$templateName][$propertyName][] = $resource;
+    }
+    
+    // Sort each property group by date
+    foreach ($organizedTemplates[$templateName] as $propertyName => &$propertyResources) {
+        usort($propertyResources, function($a, $b) {
+            $dateA = getDateValue($a['subject_resource']);
+            $dateB = getDateValue($b['subject_resource']);
+            
+            // Remove the 'zzzzz_no_date' marker for actual comparison
+            $dateA = $dateA === 'zzzzz_no_date' ? '' : $dateA;
+            $dateB = $dateB === 'zzzzz_no_date' ? '' : $dateB;
+            
+            // Handle empty dates - they should come last
+            if (empty($dateA) && empty($dateB)) return 0;
+            if (empty($dateA)) return 1;
+            if (empty($dateB)) return -1;
+            
+            // Convert to timestamps for proper date comparison
+            $timestampA = strtotime($dateA);
+            $timestampB = strtotime($dateB);
+            
+            // If strtotime fails, fall back to string comparison
+            if ($timestampA === false || $timestampB === false) {
+                return strcmp($dateA, $dateB);
+            }
+            
+            // Sort in ascending order (oldest first)
+            return $timestampA - $timestampB;
+        });
+    }
 }
 ?>
 
-<?php if (!empty($resourcesByTemplate)): ?>
+<?php if (!empty($organizedTemplates)): ?>
 <div class="property">
     <?php if ($resourcePropertiesAll && is_array($resourcePropertiesAll) && count($resourcePropertiesAll) > 1): ?>
     <select class="resource-property-select" aria-label="<?php echo $this->translate('Filter by property'); ?>">
@@ -126,18 +145,31 @@ foreach ($resourcesByTemplate as $templateName => &$resources) {
     <?php endif; ?>
     
     <div class="values">
-        <?php foreach ($resourcesByTemplate as $templateName => $resources): ?>
-            <h4 class="resource-template-heading"><?php echo $this->escapeHtml($templateName); ?></h4>
-            <ul class="resource-list">
-                <?php foreach ($resources as $item): ?>
-                <?php
-                $resource = $item['subject_resource'];
-                ?>
-                <li class="resource-list-item">
-                    <?php echo $resource->linkPretty(); ?>
-                </li>
-                <?php endforeach; ?>
-            </ul>
+        <?php foreach ($organizedTemplates as $templateName => $propertyGroups): ?>
+            <h3 class="resource-template-heading"><?php echo $this->escapeHtml($templateName); ?></h3>
+            
+            <?php foreach ($propertyGroups as $propertyName => $resources): ?>
+                <div class="property-group">
+                    <h4 class="property-heading"><?php echo $this->escapeHtml($propertyName); ?></h4>
+                    <ul class="resource-list">
+                        <?php foreach ($resources as $item): ?>
+                        <?php
+                        $resource = $item['subject_resource'];
+                        ?>
+                        <li class="resource-list-item">
+                            <?php echo $resource->linkPretty(); ?>
+                            <?php 
+                            // Optionally display the date for debugging or verification
+                            $dateValue = getDateValue($resource);
+                            if ($dateValue && $dateValue !== 'zzzzz_no_date'): 
+                            ?>
+                            <span class="resource-date">(<?php echo $this->escapeHtml($dateValue); ?>)</span>
+                            <?php endif; ?>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endforeach; ?>
         <?php endforeach; ?>
     </div>
 </div>
