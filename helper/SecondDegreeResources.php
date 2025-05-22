@@ -149,6 +149,7 @@ class SecondDegreeResources extends AbstractHelper
             $html .= '<div class="values">';
             
             $uniqueResources = []; // Track unique resources
+            $resourcesToDisplay = []; // Store resources for sorting
             
             foreach ($secondDegreeData['resources'] as $resourceData) {
                 $linkedResource = $resourceData['resource'];
@@ -162,6 +163,23 @@ class SecondDegreeResources extends AbstractHelper
                 
                 // Mark this resource as seen
                 $uniqueResources[$resourceId] = true;
+                
+                // Store for potential sorting
+                $resourcesToDisplay[] = [
+                    'resource' => $linkedResource,
+                    'connectingResource' => $connectingResource
+                ];
+            }
+            
+            // Sort by date if template ID is 15 (document) or 20 (photograph)
+            if ($secondDegreeResourceTemplate == 15 || $secondDegreeResourceTemplate == 20) {
+                $resourcesToDisplay = $this->sortResourcesByDate($resourcesToDisplay);
+            }
+            
+            // Generate HTML for each resource
+            foreach ($resourcesToDisplay as $resourceData) {
+                $linkedResource = $resourceData['resource'];
+                $connectingResource = $resourceData['connectingResource'];
                 
                 $html .= '<div class="value">';
                 
@@ -192,6 +210,135 @@ class SecondDegreeResources extends AbstractHelper
         $html .= '</div>'; // close subject-values
         
         return $html;
+    }
+    
+    /**
+     * Sort resources by date (ascending)
+     * Attempts to find date values in common date properties
+     *
+     * @param array $resourcesToDisplay Array of resource data arrays
+     * @return array Sorted array of resource data
+     */
+    protected function sortResourcesByDate($resourcesToDisplay)
+    {
+        // Common date property terms to check (in order of preference)
+        $datePropertyTerms = [
+            'dcterms:date',
+            'dcterms:created',
+            'dcterms:issued',
+            'dcterms:modified',
+            'bibo:date'
+        ];
+        
+        // Add date information to each resource for sorting
+        foreach ($resourcesToDisplay as &$resourceData) {
+            $resource = $resourceData['resource'];
+            $dateValue = null;
+            $dateTimestamp = null;
+            
+            // Try to find a date value in the resource
+            foreach ($datePropertyTerms as $term) {
+                $values = $resource->value($term, ['all' => true]);
+                if ($values) {
+                    foreach ($values as $value) {
+                        $dateString = $value->value();
+                        if ($dateString) {
+                            // Try to parse the date
+                            $timestamp = $this->parseDateToTimestamp($dateString);
+                            if ($timestamp !== null) {
+                                $dateValue = $dateString;
+                                $dateTimestamp = $timestamp;
+                                break 2; // Break out of both loops
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Store date information for sorting
+            $resourceData['dateValue'] = $dateValue;
+            $resourceData['dateTimestamp'] = $dateTimestamp;
+        }
+        
+        // Sort by date timestamp (ascending), with resources without dates at the end
+        usort($resourcesToDisplay, function($a, $b) {
+            $aTimestamp = $a['dateTimestamp'];
+            $bTimestamp = $b['dateTimestamp'];
+            
+            // If both have dates, sort by timestamp
+            if ($aTimestamp !== null && $bTimestamp !== null) {
+                return $aTimestamp <=> $bTimestamp;
+            }
+            
+            // Resources with dates come before resources without dates
+            if ($aTimestamp !== null && $bTimestamp === null) {
+                return -1;
+            }
+            if ($aTimestamp === null && $bTimestamp !== null) {
+                return 1;
+            }
+            
+            // If neither has a date, sort by title
+            return strcmp($a['resource']->displayTitle(), $b['resource']->displayTitle());
+        });
+        
+        return $resourcesToDisplay;
+    }
+    
+    /**
+     * Parse a date string to a timestamp for sorting
+     * Handles various date formats commonly found in Omeka
+     *
+     * @param string $dateString The date string to parse
+     * @return int|null Unix timestamp or null if parsing fails
+     */
+    protected function parseDateToTimestamp($dateString)
+    {
+        if (empty($dateString)) {
+            return null;
+        }
+        
+        // Clean up the date string
+        $dateString = trim($dateString);
+        
+        // Try various date formats
+        $formats = [
+            'Y-m-d',           // 2023-12-31
+            'Y-m-d H:i:s',     // 2023-12-31 23:59:59
+            'Y/m/d',           // 2023/12/31
+            'd/m/Y',           // 31/12/2023
+            'm/d/Y',           // 12/31/2023
+            'Y',               // 2023 (year only)
+            'Y-m',             // 2023-12 (year-month)
+            'd-m-Y',           // 31-12-2023
+            'F j, Y',          // December 31, 2023
+            'j F Y',           // 31 December 2023
+            'M j, Y',          // Dec 31, 2023
+            'j M Y',           // 31 Dec 2023
+        ];
+        
+        foreach ($formats as $format) {
+            $date = \DateTime::createFromFormat($format, $dateString);
+            if ($date !== false) {
+                return $date->getTimestamp();
+            }
+        }
+        
+        // Try strtotime as a fallback
+        $timestamp = strtotime($dateString);
+        if ($timestamp !== false) {
+            return $timestamp;
+        }
+        
+        // If it's just a year (4 digits), create a date for January 1st of that year
+        if (preg_match('/^\d{4}$/', $dateString)) {
+            $year = (int)$dateString;
+            if ($year > 1000 && $year < 3000) { // Reasonable year range
+                return mktime(0, 0, 0, 1, 1, $year);
+            }
+        }
+        
+        return null;
     }
     
     /**
