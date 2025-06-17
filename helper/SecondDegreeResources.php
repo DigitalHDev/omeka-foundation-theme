@@ -466,9 +466,11 @@ class SecondDegreeResources extends AbstractHelper
                 
                 foreach ($propertyValues['values'] as $value) {
                     // Only process resource links
-                    if ($value->type() !== 'resource') {
-                        continue;
-                    }
+					// Commented out by Hanan
+					// Solved a problem where resources that were added when the module Custom Vocab was active, weren't displayed.
+//                    if ($value->type() !== 'resource') {
+//                        continue;
+//                    }
                     
                     $linkedResource = $value->valueResource();
                     
