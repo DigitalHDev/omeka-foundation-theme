@@ -1,0 +1,141 @@
+<?php
+// Standard linked resources (first-degree)
+$options = [
+    'page' => $this->params()->fromQuery('page', 1),
+    'perPage' => 200,
+    'resourceProperty' => $this->params()->fromQuery('resource_property'),
+    'viewName' => 'common/linked-resources-sorted' // Use our custom view to sort according to 'date'
+];
+
+// Site setting check - apply to all queries
+$excludeResourcesNotInSite = $this->siteSetting('exclude_resources_not_in_site', false);
+if ($excludeResourcesNotInSite) {
+    $options['siteId'] = $this->currentSite()->id();
+}
+
+// Get standard linked resources HTML output
+// displaySubjectValues is in /var/www/html/application/src/Api/Representation/AbstractResourceEntityRepresentation.php
+$standardLinkedResources = $resource->displaySubjectValues($options);
+
+// Check if we should show second-degree resources
+$showSecondDegree = $this->params()->fromQuery('show_second_degree', false);
+$showSecondDegree = 1; // Force enabled for testing
+
+// Get the current resource's template ID
+$currentTemplateId = null;
+if ($resource->resourceTemplate()) {
+    $currentTemplateId = $resource->resourceTemplate()->id();
+}
+?>
+
+<?php if ($standardLinkedResources): ?>
+<div id="resources-linked">
+    <!--<h3><?php echo $this->translate('Linked Resources'); ?></h3>-->
+    <?php echo $standardLinkedResources; ?>
+</div>
+<?php endif; ?>
+
+<?php
+// Configuration mapping for different resource template types
+// Format: [config1, config2, ...] where each config is a complete configuration
+$secondDegreeConfigs = [
+    // Organization template (ID: 18)
+    18 => [
+        // Direct connection configuration
+        [
+            'title' => 'People in Events',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 17, // Person template ID
+            'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
+            'secondDegreePropertyIds' => [499 ,500 ,501 ,502 ,503 ,504 ,505 ,506 ,507 ,508 ,509 ,510 ,511 ,512 ,513 ,514 ,515 ,516 ,517 ,518 ,519 ,522 ,523], // Properties connecting Event -> Person
+            'direction' => 'direct'
+        ],
+        // Reverse connection configuration
+        [
+            'title' => 'Documents from Events',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 15, // Document template ID
+            'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Document -> Event
+            'direction' => 'reverse'
+        ],
+        // Reverse connection configuration
+        [
+            'title' => 'Photographs from Events',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 20, // Photograph template ID
+            'firstDegreePropertyIds' => [13], // Properties connecting Organization -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Photograph -> Event
+            'direction' => 'reverse'
+        ]
+    ],
+    // Person template (ID: 17)
+    17 => [
+        // Reverse connection configuration
+        [
+            'title' => 'Documents from Events',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 15, // Document template ID
+            'firstDegreePropertyIds' => [501], // Properties connecting Person -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Document -> Event
+            'direction' => 'reverse'
+        ],
+        // Reverse connection configuration
+        [
+            'title' => 'Photographs from Events',
+            'firstDegreeResourceType' => 'items',
+            'secondDegreeResourceType' => 'items',
+            'firstDegreeTemplate' => 16, // Event template ID
+            'secondDegreeTemplate' => 20, // Photograph template ID
+            'firstDegreePropertyIds' => [501], // Properties connecting Person -> Event
+            'secondDegreePropertyIds' => [13], // Properties connecting Photograph -> Event
+            'direction' => 'reverse'
+        ]
+    ]
+    // Add more configurations for other template IDs as needed
+];
+
+// Only proceed if we have configurations for the current template
+if ($showSecondDegree && $currentTemplateId && isset($secondDegreeConfigs[$currentTemplateId])):
+    // Get all configurations for this template
+    $templateConfigs = $secondDegreeConfigs[$currentTemplateId];
+    
+    // Process each configuration separately
+    foreach ($templateConfigs as $configIndex => $config):
+        // Generate a unique ID for pagination purposes
+        $paginationId = "page_second_{$configIndex}";
+        
+        // Configure options for the second-degree resources
+        $secondDegreeOptions = array_merge($config, [
+            'page' => $this->params()->fromQuery($paginationId, 1),
+            'perPage' => 200,
+            'showConnectingResource' => true
+        ]);
+        
+        // Apply site setting filter if needed
+        if ($excludeResourcesNotInSite) {
+            $secondDegreeOptions['siteId'] = $this->currentSite()->id();
+        }
+        
+        // Get second-degree linked resources HTML output
+        $secondDegreeResources = $this->SecondDegreeResources($resource, $secondDegreeOptions);
+        
+        if ($secondDegreeResources): 
+?>
+<div id="second-degree-resources-linked-<?php echo $configIndex; ?>" class="second-degree-resources-linked">
+    <h3><?php echo $this->translate($config['title']); ?></h3>
+    <?php echo $secondDegreeResources; ?>
+</div>
+<?php 
+        endif;
+    endforeach;
+endif;
+?>

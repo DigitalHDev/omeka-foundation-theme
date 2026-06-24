@@ -1,0 +1,176 @@
+<?php
+/**
+ * @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $objectResource
+ * @var array $subjectValues
+ * @var int $totalCount
+ * @var int|null $page
+ * @var int|null $perPage
+ * @var string|null $resourceProperty
+ * @var int|null $propertyId
+ * @var string|null $resourceType
+ * @var array|null $resourcePropertiesAll
+ */
+
+// Helper function to extract date value from a subject resource
+function getDateValue($resource)
+{
+    try {
+        // Try to get dcterms:date property
+        $dateValue = $resource->value('dcterms:date');
+        if ($dateValue) {
+            // Get the actual value
+            if (is_object($dateValue)) {
+                $valueText = $dateValue->value();
+                
+                // If it's a literal value, return it for sorting
+                if (method_exists($dateValue, 'type') && $dateValue->type() === 'literal') {
+                    return $valueText;
+                }
+                
+                // For other types, try to extract meaningful text
+                return $valueText ?? '';
+            }
+            return (string) $dateValue;
+        }
+    } catch (\Exception $e) {
+        // If there's any error, return empty string
+    }
+    
+    // If no date found, return a string that will sort last
+    return 'zzzzz_no_date';
+}
+
+// Two-level organization:
+// 1. First level: group by resource template
+// 2. Second level: group by property name that connects to the main resource
+$resourcesByTemplate = [];
+
+// Process all subject values and organize by template first
+foreach ($subjectValues as $propertyName => $propertyValues) {
+    foreach ($propertyValues as $value) {
+        // Get the subject resource (the one pointing to the current resource)
+        $subjectResource = $value['val']->resource();
+        
+        if ($subjectResource) {
+            // Get the template for this resource
+            $template = null;
+            $templateName = $this->translate('Other Resources');
+            
+            if ($subjectResource->resourceTemplate()) {
+                $template = $subjectResource->resourceTemplate();
+                // Make template name plural by adding 's' and use translate function
+                $templateName = $this->translate($template->label() . 's');
+            }
+            
+            // Initialize the array for this template if it doesn't exist
+            if (!isset($resourcesByTemplate[$templateName])) {
+                $resourcesByTemplate[$templateName] = [];
+            }
+            
+            // Add this resource to its template group, including the property name
+            $resourcesByTemplate[$templateName][] = [
+                'property_name' => $propertyName,
+                'value_array' => $value,
+                'subject_resource' => $subjectResource
+            ];
+        }
+    }
+}
+
+// Now organize each template group by connecting property
+$organizedTemplates = [];
+foreach ($resourcesByTemplate as $templateName => $resources) {
+    $organizedTemplates[$templateName] = [];
+    
+    // Group resources by property name
+    foreach ($resources as $resource) {
+        $propertyName = $resource['property_name'];
+        
+        if (!isset($organizedTemplates[$templateName][$propertyName])) {
+            $organizedTemplates[$templateName][$propertyName] = [];
+        }
+        
+        $organizedTemplates[$templateName][$propertyName][] = $resource;
+    }
+    
+    // Sort each property group by date
+    foreach ($organizedTemplates[$templateName] as $propertyName => &$propertyResources) {
+        usort($propertyResources, function($a, $b) {
+            $dateA = getDateValue($a['subject_resource']);
+            $dateB = getDateValue($b['subject_resource']);
+            
+            // Remove the 'zzzzz_no_date' marker for actual comparison
+            $dateA = $dateA === 'zzzzz_no_date' ? '' : $dateA;
+            $dateB = $dateB === 'zzzzz_no_date' ? '' : $dateB;
+            
+            // Handle empty dates - they should come last
+            if (empty($dateA) && empty($dateB)) return 0;
+            if (empty($dateA)) return 1;
+            if (empty($dateB)) return -1;
+            
+            // Convert to timestamps for proper date comparison
+            $timestampA = strtotime($dateA);
+            $timestampB = strtotime($dateB);
+            
+            // If strtotime fails, fall back to string comparison
+            if ($timestampA === false || $timestampB === false) {
+                return strcmp($dateA, $dateB);
+            }
+            
+            // Sort in ascending order (oldest first)
+            return $timestampA - $timestampB;
+        });
+    }
+}
+?>
+
+<?php if (!empty($organizedTemplates)): ?>
+<div class="property">
+    <?php if ($resourcePropertiesAll && is_array($resourcePropertiesAll) && count($resourcePropertiesAll) > 1): ?>
+    <select class="resource-property-select" aria-label="<?php echo $this->translate('Filter by property'); ?>">
+        <?php foreach ($resourcePropertiesAll as $type => $typeProperties): ?>
+        <?php if (is_array($typeProperties)): ?>
+        <?php foreach ($typeProperties as $typeProperty): ?>
+        <?php if (is_object($typeProperty) && method_exists($typeProperty, 'id') && method_exists($typeProperty, 'label')): ?>
+        <?php
+        $typePropertyValue = sprintf('%s:%s', $type, $typeProperty->id());
+        $typePropertyText = sprintf('%s: %s', $this->translate(ucfirst($type)), $this->translate($typeProperty->label()));
+        ?>
+        <option value="<?php echo $this->escapeHtml($typePropertyValue); ?>" <?php echo $typePropertyValue === $resourceProperty ? 'selected' : ''; ?>><?php echo $typePropertyText; ?></option>
+        <?php endif; ?>
+        <?php endforeach; ?>
+        <?php endif; ?>
+        <?php endforeach; ?>
+    </select>
+    <?php endif; ?>
+    
+    <div class="values">
+        <?php foreach ($organizedTemplates as $templateName => $propertyGroups): ?>
+            <h3 class="resource-template-heading"><?php echo $this->escapeHtml($templateName); ?></h3>
+            
+            <?php foreach ($propertyGroups as $propertyName => $resources): ?>
+                <div class="property-group">
+                    <h4 class="property-heading"><?php echo $this->escapeHtml($propertyName); ?></h4>
+                    <ul class="resource-list">
+                        <?php foreach ($resources as $item): ?>
+                        <?php
+                        $resource = $item['subject_resource'];
+                        ?>
+                        <li class="resource-list-item">
+                            <?php echo $resource->linkPretty(); ?>
+                            <?php 
+                            // Optionally display the date for debugging or verification
+                            $dateValue = getDateValue($resource);
+                            if ($dateValue && $dateValue !== 'zzzzz_no_date'): 
+                            ?>
+                            <span class="resource-date">(<?php echo $this->escapeHtml($dateValue); ?>)</span>
+                            <?php endif; ?>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endforeach; ?>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>

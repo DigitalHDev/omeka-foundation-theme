@@ -1,0 +1,73 @@
+<?php
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+$this->headLink()->appendStylesheet($this->assetUrl('css/resource-page-blocks.css', 'Omeka'));
+$this->htmlElement('body')->appendAttribute('class', 'item resource show');
+$embedMedia = $this->siteSetting('item_media_embed', false);
+$itemMedia = $item->media();
+$showLayout = $this->themeSetting('show_layout');
+$mediaDisplay = $this->themeSetting('media_display');
+$this->headLink()->appendStylesheet($this->assetUrl('css/resource-page-blocks.css', 'Omeka'));
+
+$fullWidthMainBlockContent = $this->resourcePageBlocks($item, 'full_width_main');
+$fullWidthMainHasBlocks = $fullWidthMainBlockContent->hasBlocks();
+$mainWithSidebarBlockContent = $this->resourcePageBlocks($item);
+$mainWithSidebarHasBlocks= $mainWithSidebarBlockContent->hasBlocks();
+$leftSidebarBlockContent = $this->resourcePageBlocks($item, 'left');
+$leftSidebarHasBlocks = $leftSidebarBlockContent->hasBlocks();
+$rightSidebarBlockContent = $this->resourcePageBlocks($item, 'right');
+$rightSidebarHasBlocks = $rightSidebarBlockContent->hasBlocks();
+
+$filterLocale = (bool) $this->siteSetting('filter_locale_values');
+$lang = $this->lang();
+$valueLang = $filterLocale ? [$lang, ''] : null;
+?>
+
+<div class="resource-title">
+<?php echo $this->pageTitle($item->displayTitle(null, $valueLang), 2); ?>
+<h3 class="label"><?php echo $translate('Item'); ?></h3>
+</div>
+
+<div class="<?php echo ($showLayout == 'inline') ? 'inline' : 'stack'; ?>">
+    <?php $this->trigger('view.show.before'); ?>
+    <?php if ($fullWidthMainHasBlocks): ?>
+    <div class="full-width-main">
+        <?php echo $fullWidthMainBlockContent->getBlocks(); ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($mainWithSidebarHasBlocks || $leftSidebarHasBlocks || $rightSidebarHasBlocks): ?>
+    
+    <?php 
+    if ($leftSidebarHasBlocks && $rightSidebarHasBlocks) {
+        $sidebarWidth = '3';
+        $mainWidth = '6';
+    } else {
+        $sidebarWidth = '4';
+        $mainWidth = '8';
+    }
+    ?>
+    
+    <div class="grid-x grid-margin-x">
+        <?php if ($leftSidebarHasBlocks): ?>
+        <div class="left-sidebar cell medium-<?php echo $sidebarWidth; ?>">
+            <?php echo $leftSidebarBlockContent->getBlocks(); ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($mainWithSidebarHasBlocks): ?>
+        <div class="main-with-sidebar cell medium-<?php echo $mainWidth; ?>">
+            <?php echo $mainWithSidebarBlockContent->getBlocks(); ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($rightSidebarHasBlocks): ?>
+        <div class="right-sidebar cell medium-<?php echo $sidebarWidth; ?>">
+            <?php echo $rightSidebarBlockContent->getBlocks(); ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php $this->trigger('view.show.after'); ?>
+</div>
