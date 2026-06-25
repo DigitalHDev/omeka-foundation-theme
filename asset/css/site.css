@@ -201,6 +201,7 @@ padding: 1.6rem var(--page-gutter) 1rem;
   font-weight: 400;
   cursor: pointer;
 
+  background-color: transparent; /* override Foundation's .label badge background */
   display: inline;
   padding: 2px 5px;
   box-decoration-break: clone;

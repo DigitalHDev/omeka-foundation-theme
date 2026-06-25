@@ -23,7 +23,10 @@ $aboutHeUrl = '#';
 $aboutEnUrl = '#';
 $contactUrl = '#';
 
-$siteLogo = $this->themeSetting('logo') ? $this->themeSettingAssetUrl('logo') : null;
+// Default to the bundled theme logo; an admin-uploaded logo setting overrides it.
+$siteLogo = $this->themeSetting('logo')
+    ? $this->themeSettingAssetUrl('logo')
+    : $this->assetUrl('img/logo1.png');
 ?>
 <nav class="utility-bar" aria-label="<?php echo $escape($this->translate('Site')); ?>">
     <div class="logo">
