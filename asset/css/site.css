@@ -69,6 +69,20 @@ p { font-family: var(--font-frank); font-size: var(--base-font-size); line-heigh
 /* ----------------------------------------
    LAYOUT BASICS
 ---------------------------------------- */
+/* Release the core #content/.blocks wrappers (default.css caps them at
+   75rem / ~1170px) so the full-bleed sections span the viewport.
+   The sections handle their own side padding via --page-gutter. */
+body #content {
+  max-width: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+body .blocks {
+  width: 100%;
+  margin: 0;
+}
+
 .section-container { padding: 0rem var(--page-gutter) var(--space-section); }
 .related-title {
   font-family: var(--font-narkiss);
