@@ -7,8 +7,9 @@ $this->htmlElement('html')->setAttribute('lang', $this->lang());
 $this->htmlElement('html')->setAttribute('dir', 'rtl');
 $this->headMeta()->setCharset('utf-8');
 $this->headMeta()->appendName('viewport', 'width=device-width, initial-scale=1');
-$this->headTitle($siteTitle)->setSeparator(' · ');
-$this->headTitle()->append($this->setting('installation_title', 'Omeka S'));
+// Force a single, fixed document title on every page, overriding anything
+// individual page templates may have appended to the headTitle container.
+$this->headTitle()->set('מאגר קרמיקה ישראלית');
 
 // Base Foundation stylesheet (still used by browse/item pages being redesigned
 // separately); the new design system in css/site.css is appended last so it wins.

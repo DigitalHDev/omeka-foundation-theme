@@ -128,7 +128,8 @@ padding: 1.6rem var(--page-gutter) 1rem;
 
 .search-input-wrapper {
   display: flex;
-  width: 50%;
+  width: 100%;
+  max-width: 771px; /* 671px text field + 100px search button (per design) */
   overflow: hidden;
   margin: 2vh 0;
 }
@@ -136,6 +137,8 @@ padding: 1.6rem var(--page-gutter) 1rem;
 .search-input-wrapper input,
 #panel-search-input {
   border: none;
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   padding-right: 15px;
     height: 4rem;
@@ -147,14 +150,18 @@ padding: 1.6rem var(--page-gutter) 1rem;
 #search-panel .search-input-wrapper {width: 100%;}
 .search-icon {
   background-color: var(--basalt);
-  color: currentColor;
+  color: #ffffff;
   border: none;
+  flex: 0 0 100px;
   width: 100px;
+  display: flex;
+  align-items: center;
   font-size: 1.2rem;
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.3s;
 }
+.search-icon i { color: #ffffff; }
 .search-icon:hover { background-color: #423f3a; }
 
 /* ----------------------------------------
