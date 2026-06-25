@@ -74,10 +74,10 @@ p { font-family: var(--font-frank); font-size: var(--base-font-size); line-heigh
    to every page (all are being redesigned around full-width sections that
    supply their own side padding via --page-gutter). */
 #content {
-  max-width: none;
-  width: 100%;
-  padding: 0;
-  margin: 0;
+  max-width: none!important;
+  width: 100%!important;
+  padding: 0!important;
+  margin: 0!important;
 }
 footer {
   max-width: none;
