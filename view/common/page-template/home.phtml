@@ -10,10 +10,7 @@
 $escape = $this->plugin('escapeHtml');
 $this->htmlElement('body')->appendAttribute('class', 'home');
 
-// TEMP DIAGNOSTIC — remove once the home-page error is resolved.
-try {
-
-$graph = $this->homeGraph();
+$graph = $this->HomeGraph();
 $browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
 $typeUrl = function ($id) use ($browseUrl) {
     return $browseUrl . '?resource_template_id[0]=' . $id;
@@ -41,7 +38,7 @@ $heroCaption = '';
 if ($heroItem) {
     $usedSourceIds[] = $heroItem->id();
     $heroImageUrl = $heroItem->thumbnailDisplayUrl('large');
-    $heroCaption = $this->composeResourceTitle($heroItem);
+    $heroCaption = $this->ComposeResourceTitle($heroItem);
 }
 
 // --- Discover tiles -------------------------------------------------------
@@ -109,7 +106,7 @@ if (empty($selected)) {
             <?php $resource = $entry['tile']['resource']; ?>
             <a href="<?php echo $escape($resource->url()); ?>" class="item-link">
                 <div class="image-box"><img src="<?php echo $escape($entry['tile']['imageUrl']); ?>" alt=""></div>
-                <p><?php echo $escape($this->composeResourceTitle($resource)); ?></p>
+                <p><?php echo $escape($this->ComposeResourceTitle($resource)); ?></p>
             </a>
             <?php endif; ?>
         </div>
@@ -128,7 +125,7 @@ if (empty($selected)) {
         <div class="grid-item">
             <a href="<?php echo $escape($item->url()); ?>" class="item-link">
                 <div class="masonry-image-wrapper"><img src="<?php echo $escape($imageUrl); ?>" alt=""></div>
-                <p><?php echo $escape($this->composeResourceTitle($item)); ?></p>
+                <p><?php echo $escape($this->ComposeResourceTitle($item)); ?></p>
             </a>
         </div>
         <?php endforeach; ?>
@@ -139,15 +136,3 @@ if (empty($selected)) {
     </div>
     <?php endif; ?>
 </section>
-
-<?php
-// TEMP DIAGNOSTIC — remove once the home-page error is resolved.
-} catch (\Throwable $e) {
-    echo '<pre style="white-space:pre-wrap;direction:ltr;text-align:left;'
-       . 'background:#fee;border:1px solid #c00;padding:1rem;margin:1rem;">';
-    echo $escape(get_class($e) . ': ' . $e->getMessage()) . "\n";
-    echo $escape('in ' . $e->getFile() . ':' . $e->getLine()) . "\n\n";
-    echo $escape($e->getTraceAsString());
-    echo '</pre>';
-}
-?>
