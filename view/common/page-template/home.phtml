@@ -1,0 +1,138 @@
+<?php
+/**
+ * Home page template (home-page-plan.md section 5). Ignores the page's blocks
+ * and composes four sections from live API queries:
+ *   1. Hero banner (stub image until the Banner-Image item set is wired, 8.3)
+ *   2. Search strip (title-contains, all types)
+ *   3. Discover grid (one image-bearing item per type + live counts)
+ *   4. Selected items masonry (Photographs+Documents tied to orgs in set 4211)
+ */
+$escape = $this->plugin('escapeHtml');
+$this->htmlElement('body')->appendAttribute('class', 'home');
+
+$graph = $this->homeGraph();
+$browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
+$typeUrl = function ($id) use ($browseUrl) {
+    return $browseUrl . '?resource_template_id[0]=' . $id;
+};
+
+$orgItemSetId = 4211; // Organizations item set scoping the "Selected items" grid.
+
+// Discover categories, in mockup order.
+$discoverTypes = [
+    ['id' => 17, 'label' => 'אנשים'],
+    ['id' => 16, 'label' => 'אירועים'],
+    ['id' => 15, 'label' => 'מסמכים'],
+    ['id' => 18, 'label' => 'ארגונים'],
+];
+
+// One shared pool of image-bearing Documents/Photographs feeds the hero,
+// Discover tiles and Selected items.
+$pool = $graph->imagePool(140);
+$usedSourceIds = [];
+
+// --- Hero (stub) ----------------------------------------------------------
+$heroItem = !empty($pool) ? $pool[0] : null;
+$heroImageUrl = null;
+$heroCaption = '';
+if ($heroItem) {
+    $usedSourceIds[] = $heroItem->id();
+    $heroImageUrl = $heroItem->thumbnailDisplayUrl('large');
+    $heroCaption = $this->composeResourceTitle($heroItem);
+}
+
+// --- Discover tiles -------------------------------------------------------
+$discoverTiles = [];
+foreach ($discoverTypes as $type) {
+    $tile = $graph->discoverTile($type['id'], $pool, $usedSourceIds);
+    if ($tile) {
+        $usedSourceIds[] = $tile['sourceId'];
+    }
+    $discoverTiles[] = [
+        'type' => $type,
+        'count' => $graph->typeCount($type['id']),
+        'tile' => $tile,
+    ];
+}
+
+// --- Selected items -------------------------------------------------------
+$selectedMax = 32; // 4 batches of 8.
+$selected = [];
+foreach ($pool as $item) {
+    if ($graph->belongsToOrgInSet($item, $orgItemSetId)) {
+        $selected[] = $item;
+        if (count($selected) >= $selectedMax) {
+            break;
+        }
+    }
+}
+// Fallback so the section is not empty if set 4211 is unavailable in this
+// environment; replace once the org item set is confirmed (open point 8.1).
+if (empty($selected)) {
+    $selected = array_slice($pool, 0, $selectedMax);
+}
+?>
+
+<div class="hero-section">
+    <div class="hero-image">
+        <?php if ($heroImageUrl): ?>
+        <img src="<?php echo $escape($heroImageUrl); ?>" alt="">
+        <?php endif; ?>
+        <?php if ($heroCaption !== ''): ?>
+        <div class="hero-caption"><?php echo $escape($heroCaption); ?></div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="search-bar">
+    <form class="search-input-wrapper" action="<?php echo $escape($browseUrl); ?>" method="GET" role="search">
+        <input type="hidden" name="property[0][property]" value="1">
+        <input type="hidden" name="property[0][type]" value="in">
+        <input type="text" name="property[0][text]" placeholder="הקלידו מילים לחיפוש במאגר" aria-label="<?php echo $escape($this->translate('Search the database')); ?>">
+        <button type="submit" class="search-icon" aria-label="<?php echo $escape($this->translate('Search')); ?>"><i class="ph-light ph-magnifying-glass"></i></button>
+    </form>
+</div>
+
+<hr class="divider">
+
+<section class="section-container">
+    <h2 class="section-title">גלו את המאגר</h2>
+    <div class="discover-grid">
+        <?php foreach ($discoverTiles as $entry): ?>
+        <?php $label = $entry['type']['label'] . ' (' . $entry['count'] . ')'; ?>
+        <div class="discover-item">
+            <a href="<?php echo $escape($typeUrl($entry['type']['id'])); ?>" class="label label-link"><?php echo $escape($label); ?></a>
+            <?php if ($entry['tile']): ?>
+            <?php $resource = $entry['tile']['resource']; ?>
+            <a href="<?php echo $escape($resource->url()); ?>" class="item-link">
+                <div class="image-box"><img src="<?php echo $escape($entry['tile']['imageUrl']); ?>" alt=""></div>
+                <p><?php echo $escape($this->composeResourceTitle($resource)); ?></p>
+            </a>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</section>
+
+<hr class="divider">
+
+<section class="section-container">
+    <h2 class="section-title">פריטים נבחרים</h2>
+    <div class="masonry-grid" data-initial="8" data-batch="8">
+        <div class="grid-sizer"></div>
+        <?php foreach ($selected as $item): ?>
+        <?php $imageUrl = $item->thumbnailDisplayUrl('large'); ?>
+        <div class="grid-item">
+            <a href="<?php echo $escape($item->url()); ?>" class="item-link">
+                <div class="masonry-image-wrapper"><img src="<?php echo $escape($imageUrl); ?>" alt=""></div>
+                <p><?php echo $escape($this->composeResourceTitle($item)); ?></p>
+            </a>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php if (count($selected) > 8): ?>
+    <div class="load-more-container">
+        <button id="load-more">טען עוד פריטים</button>
+    </div>
+    <?php endif; ?>
+</section>

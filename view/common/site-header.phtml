@@ -1,0 +1,78 @@
+<?php
+/**
+ * Shared site chrome: utility bar, slide-in search panel, hamburger sidebar.
+ * Used on the home page, text pages, and all other pages via layout.phtml.
+ */
+$escape = $this->plugin('escapeHtml');
+$browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
+
+// Resource-type browse categories (template ids per home-page-plan.md section 3).
+$types = [
+    ['id' => 17, 'label' => 'אנשים'],
+    ['id' => 16, 'label' => 'אירועים'],
+    ['id' => 15, 'label' => 'מסמכים'],
+    ['id' => 18, 'label' => 'ארגונים'],
+];
+$typeUrl = function ($id) use ($browseUrl) {
+    return $browseUrl . '?resource_template_id[0]=' . $id;
+};
+
+// TODO (page wiring): replace '#' once the About (HE), About (EN) and Contact
+// pages exist in admin. See follow-up task in the implementation notes.
+$aboutHeUrl = '#';
+$aboutEnUrl = '#';
+$contactUrl = '#';
+
+$siteLogo = $this->themeSetting('logo') ? $this->themeSettingAssetUrl('logo') : null;
+?>
+<nav class="utility-bar" aria-label="<?php echo $escape($this->translate('Site')); ?>">
+    <div class="logo">
+        <a href="<?php echo $escape($site->url()); ?>">
+            <?php if ($siteLogo): ?>
+            <img src="<?php echo $escape($siteLogo); ?>" alt="<?php echo $escape($site->title()); ?>">
+            <?php else: ?>
+            <?php echo $escape($site->title()); ?>
+            <?php endif; ?>
+        </a>
+    </div>
+    <div class="nav-left">
+        <div id="search-trigger" role="button" tabindex="0" aria-label="<?php echo $escape($this->translate('Search')); ?>" aria-controls="search-panel" aria-expanded="false"><i class="ph-light ph-magnifying-glass"></i></div>
+        <div id="hamburger-menu" role="button" tabindex="0" aria-label="<?php echo $escape($this->translate('Menu')); ?>" aria-controls="sidebar-overlay" aria-expanded="false"><i class="ph-light ph-list"></i></div>
+    </div>
+</nav>
+
+<div id="search-panel" class="search-panel-hidden" aria-hidden="true">
+    <button class="close-btn close-search-panel" type="button" aria-label="<?php echo $escape($this->translate('Close')); ?>"><i class="ph-light ph-x"></i></button>
+    <div class="search-inner-container">
+        <form class="panel-search-form" action="<?php echo $escape($browseUrl); ?>" method="GET" role="search">
+            <input type="hidden" name="property[0][property]" value="1">
+            <input type="hidden" name="property[0][type]" value="in">
+            <div class="search-input-wrapper">
+                <input type="text" name="property[0][text]" id="panel-search-input" placeholder="הקלידו מילים לחיפוש במאגר" aria-label="<?php echo $escape($this->translate('Search the database')); ?>">
+                <button type="submit" class="search-icon" aria-label="<?php echo $escape($this->translate('Search')); ?>"><i class="ph-light ph-magnifying-glass"></i></button>
+            </div>
+            <div class="filter-section">
+                <p class="filter-label">חיפוש בתוך:</p>
+                <div class="filter-options">
+                    <?php foreach ($types as $type): ?>
+                    <label><input type="checkbox" name="resource_template_id[]" value="<?php echo $type['id']; ?>" checked> <?php echo $escape($type['label']); ?></label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="sidebar-overlay" aria-hidden="true">
+    <div class="sidebar-content">
+        <button id="close-sidebar" class="close-btn" type="button" aria-label="<?php echo $escape($this->translate('Close')); ?>"><i class="ph-light ph-x"></i></button>
+        <ul>
+            <?php foreach ($types as $type): ?>
+            <li><a href="<?php echo $escape($typeUrl($type['id'])); ?>"><?php echo $escape($type['label']); ?></a></li>
+            <?php endforeach; ?>
+            <li><a href="<?php echo $escape($aboutHeUrl); ?>">אודות</a></li>
+            <li><a href="<?php echo $escape($aboutEnUrl); ?>">EN</a></li>
+            <li><a href="<?php echo $escape($contactUrl); ?>">יצירת קשר</a></li>
+        </ul>
+    </div>
+</div>

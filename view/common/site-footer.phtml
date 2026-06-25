@@ -1,0 +1,57 @@
+<?php
+/**
+ * Shared site footer. Final content is still TBD (home-page-plan.md section 9);
+ * structure is ported from the mockup. General links are placeholders until the
+ * About/Contact/policy pages exist in admin.
+ */
+$escape = $this->plugin('escapeHtml');
+$browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
+
+$types = [
+    ['id' => 17, 'label' => 'אנשים'],
+    ['id' => 16, 'label' => 'אירועים'],
+    ['id' => 15, 'label' => 'מסמכים'],
+    ['id' => 18, 'label' => 'ארגונים'],
+];
+$typeUrl = function ($id) use ($browseUrl) {
+    return $browseUrl . '?resource_template_id[0]=' . $id;
+};
+
+$siteLogo = $this->themeSetting('logo') ? $this->themeSettingAssetUrl('logo') : null;
+?>
+<footer class="site-footer">
+    <div class="footer-container">
+        <div class="footer-brand">
+            <a href="<?php echo $escape($site->url()); ?>" class="footer-logo-link">
+                <?php if ($siteLogo): ?>
+                <img src="<?php echo $escape($siteLogo); ?>" alt="<?php echo $escape($site->title()); ?>">
+                <?php else: ?>
+                <?php echo $escape($site->title()); ?>
+                <?php endif; ?>
+            </a>
+        </div>
+
+        <div class="footer-nav-groups">
+            <nav class="footer-links footer-links-cats" aria-label="<?php echo $escape($this->translate('Categories')); ?>">
+                <?php foreach ($types as $type): ?>
+                <a href="<?php echo $escape($typeUrl($type['id'])); ?>"><?php echo $escape($type['label']); ?></a>
+                <?php endforeach; ?>
+            </nav>
+            <nav class="footer-links footer-links-general" aria-label="<?php echo $escape($this->translate('General information')); ?>">
+                <a href="#">אודות</a>
+                <a href="#">יצירת קשר</a>
+                <a href="#">שליחת חומרים</a>
+                <a href="#">מדיניות פרטיות</a>
+                <a href="#">מדיניות נגישות</a>
+            </nav>
+        </div>
+
+        <div class="footer-meta">
+            <div class="social-icons">
+                <a href="#" aria-label="Instagram"><i class="ph-light ph-instagram-logo"></i></a>
+                <a href="#" aria-label="YouTube"><i class="ph-light ph-youtube-logo"></i></a>
+                <a href="#" aria-label="Facebook"><i class="ph-light ph-facebook-logo"></i></a>
+            </div>
+        </div>
+    </div>
+</footer>
