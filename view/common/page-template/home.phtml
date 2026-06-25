@@ -10,6 +10,9 @@
 $escape = $this->plugin('escapeHtml');
 $this->htmlElement('body')->appendAttribute('class', 'home');
 
+// TEMP DIAGNOSTIC — remove once the home-page error is resolved.
+try {
+
 $graph = $this->homeGraph();
 $browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
 $typeUrl = function ($id) use ($browseUrl) {
@@ -136,3 +139,15 @@ if (empty($selected)) {
     </div>
     <?php endif; ?>
 </section>
+
+<?php
+// TEMP DIAGNOSTIC — remove once the home-page error is resolved.
+} catch (\Throwable $e) {
+    echo '<pre style="white-space:pre-wrap;direction:ltr;text-align:left;'
+       . 'background:#fee;border:1px solid #c00;padding:1rem;margin:1rem;">';
+    echo $escape(get_class($e) . ': ' . $e->getMessage()) . "\n";
+    echo $escape('in ' . $e->getFile() . ':' . $e->getLine()) . "\n\n";
+    echo $escape($e->getTraceAsString());
+    echo '</pre>';
+}
+?>
