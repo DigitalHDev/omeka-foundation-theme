@@ -11,6 +11,9 @@
         setupOverlays();
         setupMasonry();
         setupCopyEmail();
+        setupItemDetails();
+        setupViewSwitcher();
+        setupLightbox();
     });
 
     /* ------------------------------------------------------------------ *
@@ -128,6 +131,125 @@
             if (!pending.length) {
                 $button.closest('.load-more-container').hide();
             }
+        });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Item page: "show more" details drawer (Person/Org hero)
+     * ------------------------------------------------------------------ */
+    function setupItemDetails() {
+        var $toggle = $('#toggle-item-details');
+        var $drawer = $('#item-details-drawer');
+        if (!$toggle.length || !$drawer.length) {
+            return;
+        }
+        $toggle.on('click', function () {
+            var open = $drawer.toggleClass('details-closed').hasClass('details-closed') === false;
+            $drawer.toggleClass('details-opened', open);
+            $toggle.attr('aria-expanded', open ? 'true' : 'false');
+            $toggle.text(open ? 'להציג פחות –' : 'להציג עוד +');
+        });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Item page: grid / list view switcher for related items
+     * ------------------------------------------------------------------ */
+    function setupViewSwitcher() {
+        var $container = $('#results-container');
+        if (!$container.length) {
+            return;
+        }
+        var $grid = $('#grid-view-btn');
+        var $list = $('#list-view-btn');
+
+        $grid.on('click', function () {
+            $container.addClass('is-grid').removeClass('is-list');
+            $grid.addClass('active');
+            $list.removeClass('active');
+        });
+        $list.on('click', function () {
+            $container.addClass('is-list').removeClass('is-grid');
+            $list.addClass('active');
+            $grid.removeClass('active');
+        });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Item page: installation-photos lightbox (images + YouTube videos)
+     * ------------------------------------------------------------------ */
+    function setupLightbox() {
+        var $overlay = $('#image-lightbox');
+        var $thumbs = $('.gallery-thumb-btn');
+        if (!$overlay.length || !$thumbs.length) {
+            return;
+        }
+
+        var $image = $('#lightbox-image');
+        var $video = $('#lightbox-video');
+        var $caption = $('#lightbox-caption');
+        var $download = $overlay.find('.lightbox-download');
+        var items = $thumbs.toArray();
+        var current = 0;
+
+        function render() {
+            var el = items[current];
+            var kind = el.getAttribute('data-lightbox-kind');
+            var src = el.getAttribute('data-lightbox-src') || '';
+            var caption = el.getAttribute('data-lightbox-caption') || '';
+
+            $caption.text(caption);
+            if (kind === 'video') {
+                $image.attr('src', '').hide();
+                $video.html('<iframe src="' + src + '" title="' + caption +
+                    '" frameborder="0" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>');
+                $video.prop('hidden', false).show();
+                $download.hide();
+            } else {
+                $video.html('').prop('hidden', true).hide();
+                $image.attr('src', src).attr('alt', caption).show();
+                $download.attr('data-href', el.getAttribute('data-lightbox-download') || src).show();
+            }
+        }
+
+        function open(index) {
+            current = index;
+            render();
+            $overlay.addClass('active').attr('aria-hidden', 'false');
+        }
+        function close() {
+            $overlay.removeClass('active').attr('aria-hidden', 'true');
+            $video.html('').prop('hidden', true); // stop video playback
+            $image.attr('src', '');
+        }
+        function step(delta) {
+            current = (current + delta + items.length) % items.length;
+            render();
+        }
+
+        $thumbs.each(function (i, el) {
+            $(el).on('click', function () { open(i); });
+        });
+        $overlay.find('.lightbox-close').on('click', close);
+        $overlay.find('.lightbox-prev').on('click', function () { step(-1); });
+        $overlay.find('.lightbox-next').on('click', function () { step(1); });
+        $download.on('click', function () {
+            var href = $(this).attr('data-href');
+            if (href) {
+                window.open(href, '_blank', 'noopener');
+            }
+        });
+        $overlay.on('click', function (e) {
+            if (e.target === this) {
+                close();
+            }
+        });
+        $(document).on('keyup', function (e) {
+            if (!$overlay.hasClass('active')) {
+                return;
+            }
+            if (e.key === 'Escape') { close(); }
+            else if (e.key === 'ArrowRight') { step(1); }
+            else if (e.key === 'ArrowLeft') { step(-1); }
         });
     }
 

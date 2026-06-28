@@ -1,0 +1,193 @@
+<?php
+/**
+ * Redesigned Person (17) / Organization (18) item page (Designs/item.html).
+ * Rendered from view/omeka/site/item/show.phtml for those templates only; the
+ * page chrome (header/footer) comes from view/layout/layout.phtml.
+ *
+ * @var \Omeka\Api\Representation\ItemRepresentation $item
+ */
+$escape = $this->plugin('escapeHtml');
+$this->htmlElement('body')->appendAttribute('class', 'item');
+
+$relations = $this->ItemRelations();
+
+$templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
+$typeLabel = $templateId === 18 ? 'ארגונים' : 'אנשים';
+
+$heroImage = $item->thumbnailDisplayUrl('large');
+$description = $item->value('dcterms:description');
+$birthDate = $item->value('ceramic:birthDate');
+$roleAnchors = $relations->roleAnchors($item);
+
+// Expandable "show more" details drawer. Each entry renders only when present.
+$detailGroups = [
+    ['label' => 'קישורים חיצוניים', 'term' => 'bibo:uri'],
+    ['label' => 'שמות נוספים', 'term' => 'dcterms:alternative'],
+    ['label' => 'שם פרטי', 'term' => 'foaf:firstName'],
+    ['label' => 'שם משפחה', 'term' => 'foaf:family_name'],
+    ['label' => 'קישורים לזהות', 'term' => 'dcterms:isReferencedBy'],
+];
+$detailRows = [];
+foreach ($detailGroups as $group) {
+    $values = $item->value($group['term'], ['all' => true]);
+    if ($values) {
+        $detailRows[] = ['label' => $group['label'], 'values' => $values];
+    }
+}
+
+// Related items: first-degree Events, second-degree Documents (publications).
+$events = $relations->events($item);
+$documents = $relations->relatedByTemplate($events, OmekaTheme\Helper\ItemRelations::TPL_DOCUMENT);
+$galleryTiles = $relations->galleryTiles($item);
+
+$renderCard = function ($resource) use ($escape, $relations) {
+    $card = $relations->cardData($resource);
+    ?>
+    <div class="archive-item">
+        <a href="<?php echo $escape($card['url']); ?>" class="item-link">
+            <div class="item-visual">
+                <?php if ($card['thumb']): ?><img src="<?php echo $escape($card['thumb']); ?>" alt=""><?php endif; ?>
+            </div>
+            <div class="item-metadata">
+                <div class="meta-col title-col">
+                    <?php if ($card['type'] !== ''): ?><p class="item-type-grid"><?php echo $escape($card['type']); ?></p><?php endif; ?>
+                    <h4 class="item-name"><?php echo $escape($card['name']); ?></h4>
+                </div>
+                <div class="meta-col artist-col"><?php echo $escape($card['artist']); ?></div>
+                <div class="meta-col date-col"><?php echo $escape($card['date']); ?></div>
+                <div class="meta-col medium-col"><?php echo $escape($card['medium']); ?></div>
+            </div>
+        </a>
+    </div>
+    <?php
+};
+?>
+
+<section class="section-container item-hero-grid">
+    <div class="hero-visual">
+        <?php if ($heroImage): ?>
+        <img src="<?php echo $escape($heroImage); ?>" alt="<?php echo $escape($item->displayTitle()); ?>">
+        <?php endif; ?>
+    </div>
+
+    <div class="hero-text">
+        <p class="hero-label"><?php echo $escape($typeLabel); ?></p>
+        <h1 class="hero-title"><?php echo $escape($item->displayTitle()); ?></h1>
+        <?php if ($birthDate): ?>
+        <p class="hero-dates">נ׳ <?php echo $escape((string) $birthDate); ?></p>
+        <?php endif; ?>
+        <?php if ($roleAnchors): ?>
+        <p class="hero-anchors">
+            <?php $first = true; foreach ($roleAnchors as $label): ?>
+            <?php if (!$first): ?><span class="hero-anchor-sep">/</span><?php endif; ?>
+            <a href="#related-items" class="hero-anchor-link"><?php echo $escape($label); ?></a>
+            <?php $first = false; endforeach; ?>
+        </p>
+        <?php endif; ?>
+
+        <?php if ($description): ?>
+        <div class="hero-description">
+            <p><?php echo $escape((string) $description); ?></p>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($detailRows): ?>
+        <div id="item-details-drawer" class="details-closed">
+            <?php foreach ($detailRows as $row): ?>
+            <p class="item-type-grid"><?php echo $escape($row['label']); ?></p>
+            <?php foreach ($row['values'] as $value): ?>
+            <p class="item-name"><?php echo $value->asHtml(); ?></p>
+            <?php endforeach; ?>
+            <?php endforeach; ?>
+        </div>
+        <button id="toggle-item-details" class="details-toggle-btn" aria-expanded="false">
+            להציג עוד +
+        </button>
+        <?php endif; ?>
+    </div>
+</section>
+
+<?php if ($events || $documents || $galleryTiles): ?>
+<section class="section-container" id="related-items">
+    <div class="view-controls">
+        <h3 class="related-title">פריטים קשורים</h3>
+        <div class="view-controls-actions">
+            <div class="switcher-buttons">
+                <button id="grid-view-btn" class="active" aria-label="תצוגת רשת"><i class="ph-light ph-squares-four"></i></button>
+                <button id="list-view-btn" aria-label="תצוגת רשימה"><i class="ph-light ph-list"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="results-container" class="is-grid">
+        <?php if ($events): ?>
+        <div class="result-section">
+            <div class="result-group-header">אירועים</div>
+            <div class="group-content">
+                <?php foreach ($events as $event) { $renderCard($event); } ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($documents): ?>
+        <?php if ($events): ?><hr class="group-divider"><?php endif; ?>
+        <div class="result-section">
+            <div class="result-group-header">פרסומים</div>
+            <div class="group-content">
+                <?php foreach ($documents as $document) { $renderCard($document); } ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($galleryTiles): ?>
+        <?php if ($events || $documents): ?><hr class="group-divider"><?php endif; ?>
+        <div class="result-section installation-gallery-section">
+            <div class="result-group-header">צילומי הצבה</div>
+            <div class="group-content gallery-content">
+                <?php foreach ($galleryTiles as $tile): ?>
+                <?php if (!$tile['thumb']) { continue; } ?>
+                <div class="gallery-item<?php echo $tile['kind'] === 'video' ? ' gallery-item-video' : ''; ?>">
+                    <button type="button" class="gallery-thumb-btn"
+                        data-lightbox-kind="<?php echo $escape($tile['kind']); ?>"
+                        data-lightbox-src="<?php echo $escape($tile['kind'] === 'video' ? $tile['embed'] : $tile['full']); ?>"
+                        <?php if ($tile['kind'] === 'image'): ?>data-lightbox-download="<?php echo $escape($tile['full']); ?>"<?php endif; ?>
+                        data-lightbox-caption="<?php echo $escape($tile['caption']); ?>">
+                        <img src="<?php echo $escape($tile['thumb']); ?>" alt="<?php echo $escape($tile['caption']); ?>">
+                        <span class="gallery-thumb-label"><?php echo $escape($tile['caption']); ?></span>
+                    </button>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+</section>
+
+<div id="image-lightbox" class="lightbox-overlay" aria-hidden="true">
+    <button type="button" class="lightbox-close" aria-label="סגירה">
+        <i class="ph-light ph-x"></i>
+    </button>
+    <button type="button" class="lightbox-download" aria-label="הורדת תמונה">
+        <i class="ph-light ph-download-simple"></i>
+    </button>
+    <button type="button" class="lightbox-nav lightbox-prev" aria-label="תמונה קודמת">
+        <i class="ph-light ph-caret-right"></i>
+    </button>
+    <figure class="lightbox-frame">
+        <img id="lightbox-image" src="" alt="">
+        <div id="lightbox-video" class="lightbox-video" hidden></div>
+        <figcaption id="lightbox-caption"></figcaption>
+    </figure>
+    <button type="button" class="lightbox-nav lightbox-next" aria-label="תמונה הבאה">
+        <i class="ph-light ph-caret-left"></i>
+    </button>
+</div>
+<?php endif; ?>
+
+<section class="section-container item-feedback-section">
+    <div class="item-feedback-card">
+        <p class="item-feedback-kicker">חסר לנו מידע?</p>
+        <p class="item-feedback-copy">אם יש לכם פרטים נוספים, הקשרים או תיקונים לגבי הפריט הזה, נשמח לשמוע מכם.</p>
+        <a href="#" class="item-feedback-open-btn">ספרו לנו עוד על הפריט</a>
+    </div>
+</section>

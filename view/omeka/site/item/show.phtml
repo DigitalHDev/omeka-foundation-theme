@@ -1,6 +1,15 @@
 <?php
 $translate = $this->plugin('translate');
 $escape = $this->plugin('escapeHtml');
+
+// Person (17) and Organization (18) items use the bespoke redesigned layout
+// (Designs/item.html). All other item types keep the block-based rendering below.
+$currentTemplate = $item->resourceTemplate();
+if ($currentTemplate && in_array($currentTemplate->id(), [17, 18], true)) {
+    echo $this->partial('common/item-person-org', ['item' => $item]);
+    return;
+}
+
 $this->headLink()->appendStylesheet($this->assetUrl('css/resource-page-blocks.css', 'Omeka'));
 $this->htmlElement('body')->appendAttribute('class', 'item resource show');
 $embedMedia = $this->siteSetting('item_media_embed', false);
