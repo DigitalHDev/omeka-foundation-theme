@@ -133,7 +133,7 @@ class ItemRelations extends AbstractHelper
             }
             $this->sortByDate($events);
             $groups[] = [
-                'label' => $this->roleHeading($pid),
+                'label' => $this->roleHeading($events[0], $pid),
                 'events' => $events,
             ];
         }
@@ -332,18 +332,31 @@ class ItemRelations extends AbstractHelper
     }
 
     /**
-     * Translated label for a relationship (role) property, used as the events
-     * sub-heading. Returns '' if the property cannot be read.
+     * Label for a relationship (role) property, used as the events sub-heading.
+     * Matches the pre-redesign behavior of subjectValues(): the role name is the
+     * resource-template alternate label set on the Event template for that
+     * property (already localized, e.g. "יוצר/ת"), falling back to the global
+     * property label. NOT gettext — these labels are not in the message catalog.
      */
-    protected function roleHeading($propertyId)
+    protected function roleHeading(AbstractResourceEntityRepresentation $event, $propertyId)
     {
         try {
-            $label = (string) $this->api->read('properties', ['id' => $propertyId])
+            $template = $event->resourceTemplate();
+            if ($template) {
+                $templateProperty = $template->resourceTemplateProperty($propertyId);
+                if ($templateProperty && $templateProperty->alternateLabel()) {
+                    return (string) $templateProperty->alternateLabel();
+                }
+            }
+        } catch (\Exception $e) {
+            // fall through to the global property label
+        }
+        try {
+            return (string) $this->api->read('properties', ['id' => $propertyId])
                 ->getContent()->label();
         } catch (\Exception $e) {
             return '';
         }
-        return $label === '' ? '' : (string) $this->getView()->translate($label);
     }
 
     /**

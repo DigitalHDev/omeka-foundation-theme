@@ -838,14 +838,20 @@ body:not(.item) #results-container.is-grid {
   background: var(--parchment);
   padding-top: 6px;
 }
+.result-subgroup {
+  width: 100%;
+  margin-bottom: 40px;
+}
+.result-subgroup:last-child {
+  margin-bottom: 0;
+}
 .result-subgroup-header {
-  flex-basis: 100%;
   width: 100%;
   font-family: var(--font-narkiss);
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--basalt);
-  margin: 18px 0 10px 0;
+  margin: 0 0 14px 0;
 }
 .group-interaction-note {
   font-family: var(--font-frank);

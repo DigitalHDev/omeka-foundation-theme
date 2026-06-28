@@ -49,7 +49,7 @@ foreach ($eventGroups as $group) {
     }
 }
 
-$renderCard = function ($resource) use ($escape, $relations) {
+$renderCard = function ($resource, $showType = true) use ($escape, $relations) {
     $card = $relations->cardData($resource);
     ?>
     <div class="archive-item">
@@ -59,7 +59,7 @@ $renderCard = function ($resource) use ($escape, $relations) {
             </div>
             <div class="item-metadata">
                 <div class="meta-col title-col">
-                    <?php if ($card['type'] !== ''): ?><p class="item-type-grid"><?php echo $escape($card['type']); ?></p><?php endif; ?>
+                    <?php if ($showType && $card['type'] !== ''): ?><p class="item-type-grid"><?php echo $escape($card['type']); ?></p><?php endif; ?>
                     <h4 class="item-name"><?php echo $escape($card['name']); ?></h4>
                 </div>
                 <div class="meta-col artist-col"><?php echo $escape($card['artist']); ?></div>
@@ -135,14 +135,16 @@ $renderCard = function ($resource) use ($escape, $relations) {
         <?php if ($eventGroups): ?>
         <div class="result-section">
             <div class="result-group-header">אירועים</div>
-            <div class="group-content">
-                <?php foreach ($eventGroups as $group): ?>
+            <?php foreach ($eventGroups as $group): ?>
+            <div class="result-subgroup">
                 <?php if ($group['label'] !== ''): ?>
                 <h4 class="result-subgroup-header"><?php echo $escape($group['label']); ?></h4>
                 <?php endif; ?>
-                <?php foreach ($group['events'] as $event) { $renderCard($event); } ?>
-                <?php endforeach; ?>
+                <div class="group-content">
+                    <?php foreach ($group['events'] as $event) { $renderCard($event, false); } ?>
+                </div>
             </div>
+            <?php endforeach; ?>
         </div>
         <?php endif; ?>
 
