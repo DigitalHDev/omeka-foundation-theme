@@ -107,30 +107,37 @@ class ItemRelations extends AbstractHelper
     }
 
     /**
-     * Distinct role labels under which a Person participates in Events, for the
-     * hero anchor links. Uses the resource-template alternate label (e.g.
-     * "יוצר/ת") when available, falling back to the global property label.
-     * Organizations have no creator-role edges, so this returns [].
+     * Events a Person took part in, grouped by the relationship (role) under
+     * which they are linked — not only as creator. Each group is one
+     * creator-role property that yields events, with its events sorted by date.
+     * The group label is the property label run through the translation
+     * infrastructure, so it appears in the site language.
      *
-     * @return string[] propertyId => label
+     * Organizations relate to Events through a single edge (dcterms:relation),
+     * so they return one unlabeled group.
+     *
+     * @return array[] Each: ['label' => string, 'events' => resource[]]
      */
-    public function roleAnchors(AbstractResourceEntityRepresentation $item)
+    public function eventsByRole(AbstractResourceEntityRepresentation $item)
     {
         if ($this->templateId($item) !== self::TPL_PERSON) {
-            return [];
+            $events = $this->events($item);
+            return $events ? [['label' => '', 'events' => $events]] : [];
         }
-        $anchors = [];
+
+        $groups = [];
         foreach (self::ROLE_PROPS as $pid) {
-            $events = $this->subjects($item->id(), self::TPL_EVENT, $pid);
+            $events = array_values($this->subjects($item->id(), self::TPL_EVENT, $pid));
             if (!$events) {
                 continue;
             }
-            $label = $this->roleLabel($events[0], $pid);
-            if ($label !== '') {
-                $anchors[$pid] = $label;
-            }
+            $this->sortByDate($events);
+            $groups[] = [
+                'label' => $this->roleHeading($pid),
+                'events' => $events,
+            ];
         }
-        return $anchors;
+        return $groups;
     }
 
     /**
@@ -325,28 +332,18 @@ class ItemRelations extends AbstractHelper
     }
 
     /**
-     * Alternate role label for a property as used on an Event, falling back to
-     * the global property label.
+     * Translated label for a relationship (role) property, used as the events
+     * sub-heading. Returns '' if the property cannot be read.
      */
-    protected function roleLabel(AbstractResourceEntityRepresentation $event, $propertyId)
+    protected function roleHeading($propertyId)
     {
         try {
-            $template = $event->resourceTemplate();
-            if ($template) {
-                $templateProperty = $template->resourceTemplateProperty($propertyId);
-                if ($templateProperty && $templateProperty->alternateLabel()) {
-                    return $templateProperty->alternateLabel();
-                }
-            }
-        } catch (\Exception $e) {
-            // fall through to the global label
-        }
-        try {
-            return (string) $this->api->read('properties', ['id' => $propertyId])
+            $label = (string) $this->api->read('properties', ['id' => $propertyId])
                 ->getContent()->label();
         } catch (\Exception $e) {
             return '';
         }
+        return $label === '' ? '' : (string) $this->getView()->translate($label);
     }
 
     /**

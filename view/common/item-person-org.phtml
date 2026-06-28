@@ -17,7 +17,6 @@ $typeLabel = $templateId === 18 ? 'ארגונים' : 'אנשים';
 $heroImage = $item->thumbnailDisplayUrl('large');
 $description = $item->value('dcterms:description');
 $birthDate = $item->value('ceramic:birthDate');
-$roleAnchors = $relations->roleAnchors($item);
 
 // Expandable "show more" details drawer. Each entry renders only when present.
 $detailGroups = [
@@ -35,10 +34,20 @@ foreach ($detailGroups as $group) {
     }
 }
 
-// Related items: first-degree Events, second-degree Documents (publications).
-$events = $relations->events($item);
+// Related items: first-degree Events (grouped by the relationship/role under
+// which the person took part), second-degree Documents (publications).
+$eventGroups = $relations->eventsByRole($item);
+$events = $relations->events($item); // flat list for documents + section visibility
 $documents = $relations->relatedByTemplate($events, OmekaTheme\Helper\ItemRelations::TPL_DOCUMENT);
 $galleryTiles = $relations->galleryTiles($item);
+
+// Hero anchor links = the distinct relationship names (translated) the person fills.
+$anchorLabels = [];
+foreach ($eventGroups as $group) {
+    if ($group['label'] !== '' && !in_array($group['label'], $anchorLabels, true)) {
+        $anchorLabels[] = $group['label'];
+    }
+}
 
 $renderCard = function ($resource) use ($escape, $relations) {
     $card = $relations->cardData($resource);
@@ -76,9 +85,9 @@ $renderCard = function ($resource) use ($escape, $relations) {
         <?php if ($birthDate): ?>
         <p class="hero-dates">נ׳ <?php echo $escape((string) $birthDate); ?></p>
         <?php endif; ?>
-        <?php if ($roleAnchors): ?>
+        <?php if ($anchorLabels): ?>
         <p class="hero-anchors">
-            <?php $first = true; foreach ($roleAnchors as $label): ?>
+            <?php $first = true; foreach ($anchorLabels as $label): ?>
             <?php if (!$first): ?><span class="hero-anchor-sep">/</span><?php endif; ?>
             <a href="#related-items" class="hero-anchor-link"><?php echo $escape($label); ?></a>
             <?php $first = false; endforeach; ?>
@@ -112,6 +121,9 @@ $renderCard = function ($resource) use ($escape, $relations) {
     <div class="view-controls">
         <h3 class="related-title">פריטים קשורים</h3>
         <div class="view-controls-actions">
+            <?php /* NOT DONE: the design's filter drawer (#toggle-filters / #filter-drawer with
+                     פורמט/שנים/תחום facets) is intentionally omitted — its facet values need a
+                     real data source. Tracked as an open task; do not ship static checkboxes. */ ?>
             <div class="switcher-buttons">
                 <button id="grid-view-btn" class="active" aria-label="תצוגת רשת"><i class="ph-light ph-squares-four"></i></button>
                 <button id="list-view-btn" aria-label="תצוגת רשימה"><i class="ph-light ph-list"></i></button>
@@ -120,11 +132,16 @@ $renderCard = function ($resource) use ($escape, $relations) {
     </div>
 
     <div id="results-container" class="is-grid">
-        <?php if ($events): ?>
+        <?php if ($eventGroups): ?>
         <div class="result-section">
             <div class="result-group-header">אירועים</div>
             <div class="group-content">
-                <?php foreach ($events as $event) { $renderCard($event); } ?>
+                <?php foreach ($eventGroups as $group): ?>
+                <?php if ($group['label'] !== ''): ?>
+                <h4 class="result-subgroup-header"><?php echo $escape($group['label']); ?></h4>
+                <?php endif; ?>
+                <?php foreach ($group['events'] as $event) { $renderCard($event); } ?>
+                <?php endforeach; ?>
             </div>
         </div>
         <?php endif; ?>
