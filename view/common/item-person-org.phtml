@@ -203,10 +203,14 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
 </div>
 <?php endif; ?>
 
+<?php if ($this->getHelperPluginManager()->has('commentForm')): ?>
 <section class="section-container item-feedback-section">
     <div class="item-feedback-card">
         <p class="item-feedback-kicker">חסר לנו מידע?</p>
         <p class="item-feedback-copy">אם יש לכם פרטים נוספים, הקשרים או תיקונים לגבי &ldquo;<?php echo $escape($item->displayTitle()); ?>&rdquo;, נשמח לשמוע מכם.</p>
-        <a href="#" class="item-feedback-open-btn">ספרו לנו עוד על הפריט</a>
+        <div class="item-feedback-form">
+            <?php echo $this->commentForm($item); ?>
+        </div>
     </div>
 </section>
+<?php endif; ?>

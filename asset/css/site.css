@@ -1560,73 +1560,40 @@ body.text-page .site-footer {
   max-width: 52ch;
   color: #77736f;
 }
-.item-feedback-open-btn {
-  border: 1px solid #8f8b86;
-  background: #fff;
-  color: var(--basalt);
-  font-family: var(--font-narkiss);
-  font-size: 0.94rem;
-  padding: 9px 16px;
-  cursor: pointer;
-  transition: background-color 0.25s ease, border-color 0.25s ease;
-}
-.item-feedback-open-btn:hover {
-  background: #f1f1f1;
-  border-color: #7a7772;
-}
-.item-feedback-modal {
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(30, 28, 26, 0.52);
-  z-index: 100100;
-  padding: 20px;
-}
-.item-feedback-modal.active {
-  display: flex;
-}
-.item-feedback-dialog {
-  position: relative;
-  width: min(640px, 100%);
-  background: #fff;
-  border: 1px solid #d2ceca;
-  padding: 26px 24px 22px;
-}
-.item-feedback-close {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  color: var(--basalt);
-}
-.item-feedback-close .ph-light {
-  font-size: 1.4rem;
-}
-.item-feedback-dialog h3 {
-  margin: 0 0 10px;
-  font-family: var(--font-narkiss);
-  font-size: 1.5rem;
-}
-.item-feedback-intro {
-  margin: 0 0 18px;
-  color: #6d6b67;
-}
+/* Comment module form (rendered by commentForm helper) */
 .item-feedback-form {
-  display: grid;
-  gap: 12px;
+  margin-top: 4px;
 }
-.item-feedback-form label {
+.item-feedback-form #comment-main-container {
+  display: block;
+}
+.item-feedback-form form {
+  display: grid;
+  gap: 14px;
+}
+.item-feedback-form .field {
   display: grid;
   gap: 6px;
+  margin: 0;
+  max-width: 100%;
+}
+.item-feedback-form .field-meta {
+  padding: 0;
+}
+.item-feedback-form .field-meta label {
   font-family: var(--font-narkiss);
   font-size: 0.95rem;
+  font-weight: 450;
+  color: #6b6864;
 }
-.item-feedback-form input,
-.item-feedback-form textarea {
+.item-feedback-form .inputs {
+  display: block;
+}
+.item-feedback-form input[type=text],
+.item-feedback-form input[type=email],
+.item-feedback-form input[type=url],
+.item-feedback-form textarea,
+.item-feedback-form select {
   width: 100%;
   border: 1px solid #c9c4bd;
   padding: 10px 12px;
@@ -1635,11 +1602,26 @@ body.text-page .site-footer {
   background: #fff;
   color: var(--basalt);
 }
+.item-feedback-form input:focus,
+.item-feedback-form textarea:focus,
+.item-feedback-form select:focus {
+  outline: none;
+  border-color: var(--basalt);
+}
 .item-feedback-form textarea {
   resize: vertical;
   min-height: 120px;
 }
-.item-feedback-submit {
+/* checkbox-style fields (e.g. legal agreement) sit inline */
+.item-feedback-form .inputs input[type=checkbox] {
+  width: auto;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+}
+/* submit button */
+.item-feedback-form button[type=submit],
+.item-feedback-form input[type=submit],
+.item-feedback-form .button {
   justify-self: start;
   border: 1px solid var(--basalt);
   background: var(--basalt);
@@ -1650,10 +1632,9 @@ body.text-page .site-footer {
   cursor: pointer;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
-.item-feedback-submit:hover {
+.item-feedback-form button[type=submit]:hover,
+.item-feedback-form input[type=submit]:hover,
+.item-feedback-form .button:hover {
   background: #efefef;
   color: var(--basalt);
-}
-body.feedback-modal-open {
-  overflow: hidden;
 }
