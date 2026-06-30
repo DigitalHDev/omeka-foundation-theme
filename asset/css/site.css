@@ -1638,3 +1638,94 @@ body.text-page .site-footer {
   background: #efefef;
   color: var(--basalt);
 }
+
+/* Comment confirmation dialog (CommonDialog from the Common module) */
+dialog.dialog-common {
+  width: min(420px, calc(100% - 32px));
+  max-width: 420px;
+  padding: 0;
+  border: 1px solid #d2ceca;
+  background: #fff;
+  color: var(--basalt);
+  box-shadow: 0 18px 50px rgba(30, 28, 26, 0.28);
+  font-family: var(--font-frank);
+}
+dialog.dialog-common::backdrop {
+  background: rgba(30, 28, 26, 0.52);
+}
+dialog.dialog-common .dialog-panel {
+  padding: 30px 28px 22px;
+}
+dialog.dialog-common .dialog-header {
+  min-height: 0;
+}
+dialog.dialog-common .dialog-header-close-button {
+  position: absolute;
+  top: 8px;
+  right: auto;
+  left: 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #8f8b86;
+  transition: color 0.2s ease;
+}
+dialog.dialog-common .dialog-header-close-button:hover {
+  color: var(--basalt);
+}
+dialog.dialog-common .dialog-close {
+  font-size: 1rem;
+}
+/* keep the close control accessible but hide the English "Close" label */
+dialog.dialog-common .dialog-close-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* heading is emptied for the success dialog — collapse the empty block */
+dialog.dialog-common .dialog-heading {
+  margin-top: 0;
+  font-family: var(--font-narkiss);
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
+}
+dialog.dialog-common .dialog-heading:has(h2:empty) {
+  display: none;
+}
+dialog.dialog-common .dialog-message {
+  margin-top: 0.25em;
+  font-family: var(--font-narkiss);
+  font-size: 1.15rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--basalt);
+}
+dialog.dialog-common .dialog-body:empty {
+  margin-top: 0;
+}
+dialog.dialog-common .dialog-footer {
+  margin-top: 1.4em;
+  display: flex;
+  justify-content: center;
+}
+dialog.dialog-common .dialog-button {
+  border: 1px solid var(--basalt);
+  background: var(--basalt);
+  color: #fff;
+  font-family: var(--font-narkiss);
+  font-size: 0.98rem;
+  padding: 9px 28px;
+  cursor: pointer;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+dialog.dialog-common .dialog-button:hover {
+  background: #efefef;
+  color: var(--basalt);
+}

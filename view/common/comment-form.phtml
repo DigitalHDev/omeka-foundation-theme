@@ -37,6 +37,27 @@ $this->headScript()
     ->appendFile($this->assetUrl('js/common-dialog.js', 'Common'), 'text/javascript', ['defer' => 'defer'])
     ->appendFile($this->assetUrl('js/comment.js', 'Comment'), 'text/javascript', ['defer' => 'defer']);
 
+// Localize the success confirmation dialog: drop the "Comment" heading and
+// replace the English message. Scoped to the exact success string so other
+// CommonDialog alerts (errors, etc.) are untouched.
+$this->headScript()->appendScript(<<<'JS'
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof CommonDialog === 'undefined' || !CommonDialog.dialogAlert) {
+        return;
+    }
+    var originalDialogAlert = CommonDialog.dialogAlert;
+    CommonDialog.dialogAlert = function (options) {
+        if (options && typeof options === 'object'
+            && options.message === 'Your comment is online.'
+        ) {
+            options.message = 'המידע נשלח.';
+            options.heading = '';
+        }
+        return originalDialogAlert.apply(this, arguments);
+    };
+});
+JS);
+
 // Localized overrides.
 $commentForm->get('o:body')
     ->setAttribute('placeholder', 'כיתבו לנו…')
@@ -124,9 +145,6 @@ $commentForm->prepare();
 
     <?php $element = $commentForm->get('o:body'); ?>
     <div class="field">
-        <div class="field-meta">
-            <?= $formLabel($element) ?>
-        </div>
         <div class="inputs required">
             <?= $this->formTextArea($element) ?>
         </div>
