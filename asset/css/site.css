@@ -598,7 +598,16 @@ main a[href^="tel:"]::after,
   border-bottom: 0;
 }
 
-.filter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+.filter-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px; }
+.filter-col.col-disabled { opacity: 0.4; pointer-events: none; }
+.no-results { font-family: var(--font-frank); font-size: 16px; padding: 1rem 0; }
+.pagination-gap { padding: 0 6px; color: var(--basalt); }
+@media (max-width: 768px) {
+  .filter-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+}
+@media (max-width: 480px) {
+  .filter-grid { grid-template-columns: 1fr; }
+}
 .filter-col h3 {
   font-family: var(--font-narkiss);
   font-size: 15px;

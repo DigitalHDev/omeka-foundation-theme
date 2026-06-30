@@ -1,0 +1,164 @@
+<?php
+/**
+ * Faceted search results page (designs/search.html).
+ *
+ * @var \OmekaTheme\Helper\FacetedSearch $search  Already invoked.
+ */
+$escape = $this->plugin('escapeHtml');
+$relations = $this->ItemRelations();
+
+$browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
+
+$term = $search->term();
+$selectedTypes = $search->selectedTypes();
+$selectedDecades = $search->selectedDecades();
+$selectedDomains = $search->selectedDomains();
+$selectedEtypes = $search->selectedEventTypes();
+$domainsEnabled = $search->domainColumnsEnabled();
+
+$total = $search->totalCount();
+$page = $search->page();
+$totalPages = $search->totalPages();
+$results = $search->pageResults();
+
+// Build a query array carrying the current selection (used for pagination links).
+$baseParams = array_filter([
+    'q' => $term !== '' ? $term : null,
+    'types' => $selectedTypes,
+    'decades' => $selectedDecades,
+    'domains' => $selectedDomains,
+    'etypes' => $selectedEtypes,
+], function ($v) {
+    return $v !== null && $v !== [] && $v !== '';
+});
+$pageUrl = function ($p) use ($browseUrl, $baseParams) {
+    return $browseUrl . '?' . http_build_query(['page' => $p] + $baseParams);
+};
+
+$resultsTitle = $term !== ''
+    ? sprintf('%d תוצאות חיפוש עבור: "%s"', $total, $term)
+    : sprintf('%d תוצאות', $total);
+?>
+<header class="results-banner">
+    <div class="section-container">
+        <div class="results-meta">
+            <h1 class="results-title"><?php echo $escape($resultsTitle); ?></h1>
+            <button id="toggle-filters" class="filter-btn-outline" type="button" aria-expanded="true" aria-controls="filter-drawer">
+                סינון תוצאות <i class="ph-light ph-caret-up"></i>
+            </button>
+        </div>
+    </div>
+</header>
+
+<div id="filter-drawer" class="drawer-open">
+    <form class="section-container-1" method="GET" action="<?php echo $escape($browseUrl); ?>">
+        <input type="hidden" name="q" value="<?php echo $escape($term); ?>">
+        <div class="filter-grid">
+            <div class="filter-col filter-col-types">
+                <h3>סוג</h3>
+                <?php foreach ($search->typeFacets() as $type): ?>
+                <label><input type="checkbox" name="types[]" value="<?php echo (int) $type['id']; ?>"
+                    <?php echo in_array($type['id'], $selectedTypes, true) ? 'checked' : ''; ?>>
+                    <?php echo $escape($type['label']); ?></label>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="filter-col filter-col-decades">
+                <h3>שנים</h3>
+                <?php foreach ($search->decadeFacets() as $decade): ?>
+                <label><input type="checkbox" name="decades[]" value="<?php echo (int) $decade['start']; ?>"
+                    <?php echo in_array($decade['start'], $selectedDecades, true) ? 'checked' : ''; ?>>
+                    <?php echo $escape($decade['label']); ?></label>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="filter-col filter-col-domains<?php echo $domainsEnabled ? '' : ' col-disabled'; ?>">
+                <h3>תחום</h3>
+                <?php foreach ($search->domainFacets() as $domain): ?>
+                <label><input type="checkbox" name="domains[]" value="<?php echo $escape($domain); ?>"
+                    <?php echo in_array($domain, $selectedDomains, true) ? 'checked' : ''; ?>
+                    <?php echo $domainsEnabled ? '' : 'disabled'; ?>>
+                    <?php echo $escape($domain); ?></label>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="filter-col filter-col-etypes<?php echo $domainsEnabled ? '' : ' col-disabled'; ?>">
+                <h3>סוג האירוע</h3>
+                <?php foreach ($search->eventTypeFacets() as $etype): ?>
+                <label><input type="checkbox" name="etypes[]" value="<?php echo $escape($etype); ?>"
+                    <?php echo in_array($etype, $selectedEtypes, true) ? 'checked' : ''; ?>
+                    <?php echo $domainsEnabled ? '' : 'disabled'; ?>>
+                    <?php echo $escape($etype); ?></label>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <div class="filter-drawer-actions">
+            <button type="submit" class="filter-apply-btn">סינון</button>
+        </div>
+    </form>
+</div>
+
+<section class="section-container">
+    <div class="view-controls">
+        <p class="results-count"></p>
+        <div class="switcher-buttons">
+            <button id="grid-view-btn" class="active" type="button" aria-label="תצוגת רשת"><i class="ph-light ph-squares-four"></i></button>
+            <button id="list-view-btn" type="button" aria-label="תצוגת רשימה"><i class="ph-light ph-list"></i></button>
+        </div>
+    </div>
+
+    <div id="results-container" class="is-grid">
+        <?php if (!$results): ?>
+        <p class="no-results">לא נמצאו תוצאות.</p>
+        <?php endif; ?>
+        <?php foreach ($results as $item): $card = $relations->cardData($item); ?>
+        <div class="archive-item">
+            <a href="<?php echo $escape($card['url']); ?>" class="item-link">
+                <div class="item-visual">
+                    <?php if ($card['thumb']): ?><img src="<?php echo $escape($card['thumb']); ?>" alt=""><?php endif; ?>
+                </div>
+                <div class="item-metadata">
+                    <div class="meta-col title-col">
+                        <?php if ($card['type'] !== ''): ?><p class="item-type-grid"><?php echo $escape($card['type']); ?></p><?php endif; ?>
+                        <h4 class="item-name"><?php echo $escape($card['name']); ?></h4>
+                    </div>
+                    <div class="meta-col artist-col"><?php echo $escape($card['artist']); ?></div>
+                    <div class="meta-col date-col"><?php echo $escape($card['date']); ?></div>
+                    <div class="meta-col medium-col"><?php echo $escape($card['medium']); ?></div>
+                </div>
+            </a>
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <?php if ($totalPages > 1): ?>
+    <nav class="pagination" aria-label="Pagination">
+        <?php if ($page > 1): ?>
+        <a href="<?php echo $escape($pageUrl($page - 1)); ?>" aria-label="Previous page"><i class="ph-light ph-caret-right"></i></a>
+        <?php endif; ?>
+        <?php
+        // Windowed page list: first, last, and a small range around the current page.
+        $window = 2;
+        $shown = [];
+        for ($p = 1; $p <= $totalPages; $p++) {
+            if ($p === 1 || $p === $totalPages || abs($p - $page) <= $window) {
+                $shown[] = $p;
+            }
+        }
+        $prev = 0;
+        foreach ($shown as $p):
+            if ($p - $prev > 1): ?>
+        <span class="pagination-gap">…</span>
+        <?php endif; $prev = $p; ?>
+            <?php if ($p === $page): ?>
+        <span class="pagination-current" aria-current="page"><?php echo $p; ?></span>
+            <?php else: ?>
+        <a href="<?php echo $escape($pageUrl($p)); ?>"><?php echo $p; ?></a>
+            <?php endif; ?>
+        <?php endforeach; ?>
+        <?php if ($page < $totalPages): ?>
+        <a href="<?php echo $escape($pageUrl($page + 1)); ?>" aria-label="Next page"><i class="ph-light ph-caret-left"></i></a>
+        <?php endif; ?>
+    </nav>
+    <?php endif; ?>
+</section>

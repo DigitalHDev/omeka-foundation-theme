@@ -14,7 +14,7 @@ $types = [
     ['id' => 18, 'label' => 'ארגונים'],
 ];
 $typeUrl = function ($id) use ($browseUrl) {
-    return $browseUrl . '?resource_template_id[0]=' . $id;
+    return $browseUrl . '?types[]=' . $id;
 };
 
 // TODO (page wiring): replace '#' once the About (HE), About (EN) and Contact
@@ -48,17 +48,15 @@ $siteLogo = $this->themeSetting('logo')
     <button class="close-btn close-search-panel" type="button" aria-label="<?php echo $escape($this->translate('Close')); ?>"><i class="ph-light ph-x"></i></button>
     <div class="search-inner-container">
         <form class="panel-search-form" action="<?php echo $escape($browseUrl); ?>" method="GET" role="search">
-            <input type="hidden" name="property[0][property]" value="1">
-            <input type="hidden" name="property[0][type]" value="in">
             <div class="search-input-wrapper">
-                <input type="text" name="property[0][text]" id="panel-search-input" placeholder="הקלידו מילים לחיפוש במאגר" aria-label="<?php echo $escape($this->translate('Search the database')); ?>">
+                <input type="text" name="q" id="panel-search-input" placeholder="הקלידו מילים לחיפוש במאגר" aria-label="<?php echo $escape($this->translate('Search the database')); ?>">
                 <button type="submit" class="search-icon" aria-label="<?php echo $escape($this->translate('Search')); ?>"><i class="ph-light ph-magnifying-glass"></i></button>
             </div>
             <div class="filter-section">
                 <p class="filter-label">חיפוש בתוך:</p>
                 <div class="filter-options">
                     <?php foreach ($types as $type): ?>
-                    <label><input type="checkbox" name="resource_template_id[]" value="<?php echo $type['id']; ?>" checked> <?php echo $escape($type['label']); ?></label>
+                    <label><input type="checkbox" name="types[]" value="<?php echo $type['id']; ?>" checked> <?php echo $escape($type['label']); ?></label>
                     <?php endforeach; ?>
                 </div>
             </div>

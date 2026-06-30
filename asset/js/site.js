@@ -14,6 +14,7 @@
         setupItemDetails();
         setupViewSwitcher();
         setupLightbox();
+        setupSearchFilters();
     });
 
     /* ------------------------------------------------------------------ *
@@ -251,6 +252,45 @@
             else if (e.key === 'ArrowRight') { step(1); }
             else if (e.key === 'ArrowLeft') { step(-1); }
         });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Search results: filter drawer toggle + domain/event-type column gating
+     * ------------------------------------------------------------------ */
+    function setupSearchFilters() {
+        var $drawer = $('#filter-drawer');
+        if (!$drawer.length) {
+            return;
+        }
+
+        // Open / close the filter drawer.
+        var $toggle = $('#toggle-filters');
+        $toggle.on('click', function () {
+            var open = !$drawer.hasClass('drawer-open');
+            $drawer.toggleClass('drawer-open', open).toggleClass('drawer-closed', !open);
+            $toggle.attr('aria-expanded', open ? 'true' : 'false');
+            $toggle.find('i')
+                .toggleClass('ph-caret-up', open)
+                .toggleClass('ph-caret-down', !open);
+        });
+
+        // Domain (תחום) and event-type (סוג האירוע) columns apply only when
+        // Events (16) or Documents (15) are among the selected item types.
+        var $typeInputs = $drawer.find('.filter-col-types input[type="checkbox"]');
+        var $depCols = $drawer.find('.filter-col-domains, .filter-col-etypes');
+        function refreshDependentColumns() {
+            var enabled = false;
+            $typeInputs.each(function () {
+                var v = parseInt(this.value, 10);
+                if (this.checked && (v === 15 || v === 16)) {
+                    enabled = true;
+                }
+            });
+            $depCols.toggleClass('col-disabled', !enabled);
+            $depCols.find('input[type="checkbox"]').prop('disabled', !enabled);
+        }
+        $typeInputs.on('change', refreshDependentColumns);
+        refreshDependentColumns();
     }
 
     /* ------------------------------------------------------------------ *

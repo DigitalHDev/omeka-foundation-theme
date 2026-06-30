@@ -11,6 +11,18 @@ $valueLang = $filterLocale ? [$lang, ''] : null;
 
 $query = $this->params()->fromQuery();
 
+// ---------------------------------------------------------------------------
+// Faceted search / results page (designs/search.html).
+// Active for the plain item browse whenever any search param is present (the
+// header search-bar, the search panel, or a hamburger item-type link). Item-set
+// browse pages keep the original layout below.
+// ---------------------------------------------------------------------------
+$searchKeys = ['q', 'types', 'decades', 'domains', 'etypes', 'resource_template_id', 'property'];
+if (!isset($itemSet) && array_intersect($searchKeys, array_keys($query))) {
+    echo $this->partial('common/search-results', ['search' => $this->FacetedSearch()]);
+    return;
+}
+
 $templateName = null;
 // Dictionary of template IDs to template names
 $templateNames = [
