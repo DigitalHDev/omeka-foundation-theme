@@ -38,19 +38,24 @@ $this->headScript()
     ->appendFile($this->assetUrl('js/comment.js', 'Comment'), 'text/javascript', ['defer' => 'defer']);
 
 // Localize the success confirmation dialog: drop the "Comment" heading and
-// replace the English message. Scoped to the exact success string so other
-// CommonDialog alerts (errors, etc.) are untouched.
+// replace the English messages. Scoped to the exact success strings (both the
+// immediate and the "pending moderation" variants) so other CommonDialog
+// alerts (errors, etc.) are untouched.
 $this->headScript()->appendScript(<<<'JS'
 document.addEventListener('DOMContentLoaded', function () {
     if (typeof CommonDialog === 'undefined' || !CommonDialog.dialogAlert) {
         return;
     }
+    var messageMap = {
+        'Your comment is online.': 'המידע נשלח, תודה',
+        'Your comment was added. It will be displayed once approved.': 'המידע נשלח, תודה'
+    };
     var originalDialogAlert = CommonDialog.dialogAlert;
     CommonDialog.dialogAlert = function (options) {
         if (options && typeof options === 'object'
-            && options.message === 'Your comment is online.'
+            && messageMap.hasOwnProperty(options.message)
         ) {
-            options.message = 'המידע נשלח.';
+            options.message = messageMap[options.message];
             options.heading = '';
         }
         return originalDialogAlert.apply(this, arguments);
