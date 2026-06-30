@@ -214,6 +214,10 @@ class ItemRelations extends AbstractHelper
      * Flatten a resource into the column data used by an "archive-item" card in
      * the related-items grid.
      *
+     * Events have no media of their own, so their card visual is borrowed from a
+     * Document connected to the Event (see eventThumbnail()). The pick is random,
+     * so the image varies between requests.
+     *
      * @return array ['url','thumb','type','name','artist','date','medium']
      */
     public function cardData(AbstractResourceEntityRepresentation $resource)
@@ -223,16 +227,39 @@ class ItemRelations extends AbstractHelper
         if ($type === '' && $template) {
             $type = $template->label();
         }
+        $thumb = $resource->thumbnailDisplayUrl('medium')
+            ?: $resource->thumbnailDisplayUrl('large');
+        if (!$thumb && $this->templateId($resource) === self::TPL_EVENT) {
+            $thumb = $this->eventThumbnail($resource);
+        }
         return [
             'url' => $resource->url(),
-            'thumb' => $resource->thumbnailDisplayUrl('medium')
-                ?: $resource->thumbnailDisplayUrl('large'),
+            'thumb' => $thumb,
             'type' => $type,
             'name' => $resource->displayTitle(),
             'artist' => $this->creatorNames($resource),
             'date' => $this->literal($resource, 'dcterms:date'),
             'medium' => $this->literal($resource, 'dcterms:medium'),
         ];
+    }
+
+    /**
+     * A thumbnail for an Event card, taken from the media of a Document
+     * connected to the Event (Event <- Document via dcterms:relation). One image
+     * is chosen at random across all qualifying media so the card image varies
+     * between requests. Returns '' when no related Document carries an image.
+     */
+    public function eventThumbnail(AbstractResourceEntityRepresentation $event)
+    {
+        $thumbs = [];
+        foreach ($this->relatedByTemplate([$event], self::TPL_DOCUMENT) as $document) {
+            foreach ($document->media() as $media) {
+                if ($media->hasThumbnails()) {
+                    $thumbs[] = $media->thumbnailUrl('medium');
+                }
+            }
+        }
+        return $thumbs ? $thumbs[array_rand($thumbs)] : '';
     }
 
     // ---- low-level helpers -------------------------------------------------
