@@ -1618,6 +1618,11 @@ body.text-page .site-footer {
   margin-inline-end: 6px;
   vertical-align: middle;
 }
+/* antispam (robot-check) field: English question + numeric answer → LTR */
+.item-feedback-form .comment-antispam {
+  direction: ltr;
+  text-align: left;
+}
 /* submit button */
 .item-feedback-form button[type=submit],
 .item-feedback-form input[type=submit],

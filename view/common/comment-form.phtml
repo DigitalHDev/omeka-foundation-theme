@@ -64,6 +64,18 @@ $commentForm->get('o:body')
     ->setAttribute('rows', 4);
 $commentForm->get('submit')
     ->setLabel('שליחה');
+// Anonymous name/email: localized placeholders; labels are dropped from the
+// markup below, so keep an aria-label for accessibility.
+if ($commentForm->has('o:name')) {
+    $commentForm->get('o:name')
+        ->setAttribute('placeholder', 'שמי הוא...')
+        ->setAttribute('aria-label', 'שם');
+}
+if ($commentForm->has('o:email')) {
+    $commentForm->get('o:email')
+        ->setAttribute('placeholder', 'כתובת האמייל שלי היא (לא יוצג)')
+        ->setAttribute('aria-label', 'דוא״ל');
+}
 
 $user = $this->identity();
 $isAnonymous = empty($user);
@@ -83,22 +95,18 @@ $commentForm->prepare();
 <?php if ($isAnonymous): ?>
     <?php $element = $commentForm->get('o:name'); ?>
     <div class="field">
-        <div class="field-meta">
-            <?= $formLabel($element) ?>
-        </div>
         <div class="inputs">
             <?= $formText($element) ?>
         </div>
     </div>
     <?php $element = $commentForm->get('o:email'); ?>
     <div class="field">
-        <div class="field-meta">
-            <?= $formLabel($element) ?>
-        </div>
         <div class="inputs required">
             <?= $formText($element) ?>
         </div>
     </div>
+    <?php // Website field only exists when the "Display website field" setting is on. ?>
+    <?php if ($commentForm->has('o:website')): ?>
     <?php $element = $commentForm->get('o:website'); ?>
     <div class="field">
         <div class="field-meta">
@@ -108,6 +116,7 @@ $commentForm->prepare();
             <?= $formText($element) ?>
         </div>
     </div>
+    <?php endif; ?>
 <?php elseif ($commentForm->has('comment_identity_mode')): ?>
     <?php // Identity mode (alias/anonymous) for logged-in users. ?>
     <?php $element = $commentForm->get('comment_identity_mode'); ?>
@@ -169,7 +178,8 @@ $commentForm->prepare();
     <?php endif; ?>
     <?php if ($commentForm->has('address')): /* quick anti-robot */ ?>
     <?php $element = $commentForm->get('address'); ?>
-    <div class="field">
+    <?php // Antispam question + answer are English/numeric: force LTR. ?>
+    <div class="field comment-antispam">
         <div class="field-meta">
             <?= $formLabel($element) ?>
         </div>
@@ -183,16 +193,11 @@ $commentForm->prepare();
     <?= $formHidden($element) ?>
     <?php endif; ?>
     <?php if ($commentForm->has('legal_agreement')): ?>
-    <?php $element = $commentForm->get('legal_agreement'); ?>
-    <div class="field">
-        <div class="field-meta">
-            <?= $formLabel($element) ?>
-        </div>
-        <div class="inputs required">
-            <?= $this->setting('comment_legal_text') ?>
-            <?= $this->formCheckbox($element) ?>
-        </div>
-    </div>
+    <?php // Terms-of-service UI removed: auto-confirm the agreement so the
+          // required validator passes. (The legal text is still configured to
+          // keep the antispam/honeypot fields enabled, which the module gates
+          // on it.) ?>
+    <input type="hidden" name="legal_agreement" value="1">
     <?php endif; ?>
 <?php endif; ?>
 
