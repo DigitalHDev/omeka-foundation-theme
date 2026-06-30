@@ -193,11 +193,13 @@ $commentForm->prepare();
     <?= $formHidden($element) ?>
     <?php endif; ?>
     <?php if ($commentForm->has('legal_agreement')): ?>
-    <?php // Terms-of-service UI removed: auto-confirm the agreement so the
-          // required validator passes. (The legal text is still configured to
-          // keep the antispam/honeypot fields enabled, which the module gates
-          // on it.) ?>
-    <input type="hidden" name="legal_agreement" value="1">
+    <?php // Terms-of-service UI removed: auto-accept the agreement. It must be a
+          // *checked checkbox* (not a plain hidden input): comment.js validates
+          // it client-side via .prop('checked'), and the server requires the
+          // value to be present. Hidden via CSS so no UI is shown. (The legal
+          // text stays configured to keep the antispam/honeypot fields, which
+          // the module gates on it.) ?>
+    <input type="checkbox" name="legal_agreement" value="1" checked="checked" style="display: none;" tabindex="-1" aria-hidden="true">
     <?php endif; ?>
 <?php endif; ?>
 
