@@ -1,0 +1,194 @@
+<?php
+/**
+ * Theme override of Comment module's comment-form partial.
+ *
+ * Customizations vs. upstream (Comment v3.4.18):
+ *  - Localized body placeholder + submit label to Hebrew.
+ *  - Body textarea reduced to 4 rows (was 12).
+ *  - Enqueues the comment/common-dialog assets here, because this theme renders
+ *    only the form (commentForm) and not the comments list (commentsResource),
+ *    and upstream loads those assets from the list partial. Without them the
+ *    form does a plain POST and the browser shows the raw JSON response.
+ *
+ * @var \Laminas\View\Renderer\PhpRenderer $this
+ * @var \Comment\Form\CommentForm $commentForm
+ * @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $resource
+ * @var string $label
+ * @var string $structure "flat" (default) or "threaded"
+ * @var bool $closedOnLoad
+ * @var int $maxLength
+ * @var bool $skipGravatar
+ * @var string $legalText
+ * @var null $parentId For threaded structure only.
+ */
+
+$plugins = $this->getHelperPluginManager();
+$formText = $plugins->get('formText');
+$formLabel = $plugins->get('formLabel');
+$formHidden = $plugins->get('formHidden');
+$formElement = $plugins->get('formElement');
+
+// Assets the form needs for AJAX submit + confirmation dialog. Upstream loads
+// these from the comments-list partial, which this theme intentionally omits.
+$this->headLink()
+    ->appendStylesheet($this->assetUrl('css/common-dialog.css', 'Common'))
+    ->appendStylesheet($this->assetUrl('css/comment.css', 'Comment'));
+$this->headScript()
+    ->appendFile($this->assetUrl('js/common-dialog.js', 'Common'), 'text/javascript', ['defer' => 'defer'])
+    ->appendFile($this->assetUrl('js/comment.js', 'Comment'), 'text/javascript', ['defer' => 'defer']);
+
+// Localized overrides.
+$commentForm->get('o:body')
+    ->setAttribute('placeholder', 'כיתבו לנו…')
+    ->setAttribute('rows', 4);
+$commentForm->get('submit')
+    ->setLabel('שליחה');
+
+$user = $this->identity();
+$isAnonymous = empty($user);
+
+$commentForm->prepare();
+?>
+
+<div id="comment-main-container" data-is-anonymous="<?= (int) $isAnonymous ?>">
+    <?php // echo $this->form($commentForm) ?>
+    <?php // TODO Add messages only if not set by layout. Anyway, they are available via json. ?>
+    <?php if (false && $messages = $this->messages()): ?>
+    <div id="comments-flash"><?= $messages ?></div>
+    <?php endif; ?>
+
+    <?= $this->form()->openTag($commentForm) ?>
+
+<?php if ($isAnonymous): ?>
+    <?php $element = $commentForm->get('o:name'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs">
+            <?= $formText($element) ?>
+        </div>
+    </div>
+    <?php $element = $commentForm->get('o:email'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs required">
+            <?= $formText($element) ?>
+        </div>
+    </div>
+    <?php $element = $commentForm->get('o:website'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs">
+            <?= $formText($element) ?>
+        </div>
+    </div>
+<?php elseif ($commentForm->has('comment_identity_mode')): ?>
+    <?php // Identity mode (alias/anonymous) for logged-in users. ?>
+    <?php $element = $commentForm->get('comment_identity_mode'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs">
+            <?= $formElement($element) ?>
+        </div>
+    </div>
+    <?php if ($commentForm->has('o:name')): ?>
+    <?php $element = $commentForm->get('o:name'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs">
+            <?= $formText($element) ?>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php if ($commentForm->has('o:email')): ?>
+    <?php $element = $commentForm->get('o:email'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs">
+            <?= $formText($element) ?>
+        </div>
+    </div>
+    <?php endif; ?>
+<?php endif; ?>
+
+    <?php $element = $commentForm->get('o:body'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs required">
+            <?= $this->formTextArea($element) ?>
+        </div>
+    </div>
+
+<?php if ($isAnonymous): ?>
+    <?php if ($commentForm->has('g-recaptcha-response')): ?>
+    <?php $element = $commentForm->get('g-recaptcha-response'); ?>
+    <div class="field">
+        <div class="inputs required">
+            <?= $formElement($element) ?>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php if ($commentForm->has('o:check')): /* honeyspot */ ?>
+    <?php $element = $commentForm->get('o:check'); ?>
+    <div class="field">
+        <div class="inputs required">
+            <?= $formElement($element) ?>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php if ($commentForm->has('address')): /* quick anti-robot */ ?>
+    <?php $element = $commentForm->get('address'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs required">
+            <?= $formElement($element) ?>
+        </div>
+    </div>
+    <?php $element = $commentForm->get('address_a'); ?>
+    <?= $formHidden($element) ?>
+    <?php $element = $commentForm->get('address_b'); ?>
+    <?= $formHidden($element) ?>
+    <?php endif; ?>
+    <?php if ($commentForm->has('legal_agreement')): ?>
+    <?php $element = $commentForm->get('legal_agreement'); ?>
+    <div class="field">
+        <div class="field-meta">
+            <?= $formLabel($element) ?>
+        </div>
+        <div class="inputs required">
+            <?= $this->setting('comment_legal_text') ?>
+            <?= $this->formCheckbox($element) ?>
+        </div>
+    </div>
+    <?php endif; ?>
+<?php endif; ?>
+
+    <?= $formHidden($commentForm->get('resource_id')) ?>
+    <?= $formHidden($commentForm->get('comment_parent_id')) ?>
+    <?= $formHidden($commentForm->get('path')) ?>
+    <?= $formHidden($commentForm->get('csrf_' . $resource->id())) ?>
+    <?php $element = $commentForm->get('submit'); ?>
+    <div class="field">
+        <div class="field-meta">
+        </div>
+        <div class="inputs required">
+            <?= $this->formElement($element) ?>
+        </div>
+    </div>
+    <?= $this->form()->closeTag() ?>
+</div>
