@@ -1623,6 +1623,10 @@ body.text-page .site-footer {
   direction: ltr;
   text-align: left;
 }
+.item-feedback-form .comment-antispam label {
+  direction: ltr;
+  text-align: left;
+}
 /* submit button */
 .item-feedback-form button[type=submit],
 .item-feedback-form input[type=submit],
