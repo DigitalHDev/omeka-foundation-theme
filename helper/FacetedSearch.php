@@ -524,7 +524,21 @@ class FacetedSearch extends AbstractHelper
         if (!is_array($references)) {
             return [];
         }
-        $values = array_keys($references);
+        // Two possible shapes depending on the module's output mode:
+        //   - associative: [value => count, ...]      -> values are the keys
+        //   - list:        [['val' => value, ...], ...] -> values are each row's 'val'
+        // Passing first_digits forces the module to the "list" shape regardless of
+        // the requested "associative" output, so handle both.
+        $values = [];
+        foreach ($references as $key => $ref) {
+            if (is_array($ref)) {
+                if (array_key_exists('val', $ref)) {
+                    $values[] = $ref['val'];
+                }
+            } else {
+                $values[] = $key;
+            }
+        }
         // Drop empty values.
         return array_values(array_filter($values, function ($v) {
             return trim((string) $v) !== '';
