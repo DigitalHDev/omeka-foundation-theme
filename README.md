@@ -1,3 +1,7 @@
+# Beit Binyamini Fork 
+
+This is a fork of the Foundation theme described below. It implements wide ranging changes as specified for the Beit Binyamini site. It is intended for Omeka/S 4.2.0. Look at Claud.md for a description of the modifications. It is reccomended to work on this in Claude Code. The repository is sinchronized with /var/www/html/themes/foundation-Dev on the server.
+
 # Foundation S
 
 This is an Omeka S theme based on ZURB Foundation Sites. It currently comes with a default stylesheet for prototyping as well as 3 other style options. 
