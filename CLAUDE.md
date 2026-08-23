@@ -8,6 +8,9 @@ This is a customized version of the Omeka S Foundation theme ("Foundation-Dev", 
 
 - **Theme repo** (this directory): `C:\Users\gilsh\source\repos\omeka-foundation-theme - Dev`
   Contains the theme files that get deployed to an Omeka S installation's `themes/` directory.
+- **`Relationships.md`** (this directory): the data model — resource templates, the properties
+  used as edges, edge directions, standard traversals, and known inconsistencies. **Read it
+  before writing or changing any code that walks between item types.**
 - **Omeka S core** (read-only reference): `C:\Users\gilsh\source\repos\omeka-s`
   The full Omeka S 4.2 source. Use this to look up core view helpers, controllers, API behavior, default templates, and resource page block logic. Do not modify files here.
 - **AdvancedSearch module** (read-only reference): `C:\Users\gilsh\source\repos\Omeka-S-module-AdvancedSearch`
@@ -71,7 +74,14 @@ helper. Do not leave a major change documented only in commit messages or chat. 
 changes (copy tweaks, small style/markup fixes, bug fixes with no interface change) do not
 require this.
 
+Anything that touches the **data model or graph traversal** — a new edge, a new property id, a
+changed direction, a new item type, or a newly discovered inconsistency — must also be recorded
+in `Relationships.md` in the same change.
+
 ## SecondDegreeResources usage policy
+
+The edges themselves are documented in `Relationships.md`; this section covers which code may
+implement them.
 
 The `SecondDegreeResources` helper encapsulates tested traversal logic for the
 site's Event-centric graph (Document/Photograph → Event → Organization, and

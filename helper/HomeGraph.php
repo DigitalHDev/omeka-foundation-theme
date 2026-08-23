@@ -18,9 +18,10 @@ use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
  *   - Event -> Person                                via ceramic:creator (501)
  *
  * Usage from a template:
- *   $graph = $this->homeGraph();
- *   $pool  = $graph->imagePool(120);
- *   $tile  = $graph->discoverTile(HomeGraph::TPL_PERSON, $pool);
+ *   $graph    = $this->homeGraph();
+ *   $pool     = $graph->imagePool(120);
+ *   $tile     = $graph->discoverTile(HomeGraph::TPL_PERSON, $pool);
+ *   $selected = $graph->orgDescendantPool(4211, 32);
  */
 class HomeGraph extends AbstractHelper
 {
@@ -32,6 +33,12 @@ class HomeGraph extends AbstractHelper
 
     const PROP_RELATION = 13;   // dcterms:relation
     const PROP_CREATOR = 501;   // ceramic:creator
+
+    /** Bounds for orgDescendantPool(): sample sizes and per-query clause/id chunking. */
+    const SAMPLE_ORGS = 12;
+    const SAMPLE_EVENTS = 60;
+    const OR_CHUNK = 50;
+    const HYDRATE_CHUNK = 40;
 
     /** @var \Omeka\Api\Manager */
     protected $api;
@@ -141,35 +148,127 @@ class HomeGraph extends AbstractHelper
     }
 
     /**
-     * Whether a Document/Photograph belongs to an organization in the given
-     * item set, by relation directly (Doc -> Org) or via its Event
-     * (Doc -> Event -> Org). Implements the "both direct and via Event" rule.
+     * Image-bearing Documents and Photographs that are grandchildren of the
+     * Organizations in an item set: Org <- Event <- Document/Photograph. Both
+     * edges are dcterms:relation (13) pointing "up", so both hops are reverse
+     * (subject) lookups — the same rule as ItemRelations::events() and
+     * ItemRelations::relatedByTemplate().
      *
-     * @param AbstractResourceEntityRepresentation $item
-     * @param int $itemSetId
-     * @return bool
+     * Organizations and Events are sampled per request so the section varies
+     * between loads while each reverse query stays bounded.
+     *
+     * @param int $itemSetId Item set holding the Organizations.
+     * @param int $limit Number of image-bearing items wanted.
+     * @return AbstractResourceEntityRepresentation[]
      */
-    public function belongsToOrgInSet(AbstractResourceEntityRepresentation $item, $itemSetId)
+    public function orgDescendantPool($itemSetId, $limit = 32)
     {
-        foreach ($this->relationTargets($item) as $target) {
-            $targetTemplate = $this->templateId($target);
-            if ($targetTemplate === self::TPL_ORGANIZATION && $this->inItemSet($target, $itemSetId)) {
-                return true;
+        $orgIds = $this->sample($this->orgIdsInSet($itemSetId), self::SAMPLE_ORGS);
+        if (!$orgIds) {
+            return [];
+        }
+        $eventIds = $this->sample(
+            $this->subjectIds($orgIds, self::TPL_EVENT, self::PROP_RELATION),
+            self::SAMPLE_EVENTS
+        );
+        if (!$eventIds) {
+            return [];
+        }
+        $itemIds = array_values(array_unique(array_merge(
+            $this->subjectIds($eventIds, self::TPL_DOCUMENT, self::PROP_RELATION),
+            $this->subjectIds($eventIds, self::TPL_PHOTOGRAPH, self::PROP_RELATION)
+        )));
+        shuffle($itemIds);
+        return $this->hydrateWithImages($itemIds, $limit);
+    }
+
+    // ---- low-level helpers -------------------------------------------------
+
+    /** Ids of the Organizations in an item set, scoped to the current site. */
+    protected function orgIdsInSet($itemSetId)
+    {
+        $query = [
+            'item_set_id' => $itemSetId,
+            'resource_template_id' => self::TPL_ORGANIZATION,
+        ];
+        if ($this->siteId) {
+            $query['site_id'] = $this->siteId;
+        }
+        return $this->scalarIds($query);
+    }
+
+    /**
+     * Ids of items of a template that reference any of $targetIds through one
+     * property. Clauses are OR'd and chunked to keep single queries bounded.
+     *
+     * @return int[]
+     */
+    protected function subjectIds(array $targetIds, $templateId, $propertyId)
+    {
+        $ids = [];
+        foreach (array_chunk($targetIds, self::OR_CHUNK) as $chunk) {
+            $query = ['resource_template_id' => $templateId];
+            if ($this->siteId) {
+                $query['site_id'] = $this->siteId;
             }
-            if ($targetTemplate === self::TPL_EVENT) {
-                foreach ($this->relationTargets($target) as $org) {
-                    if ($this->templateId($org) === self::TPL_ORGANIZATION
-                        && $this->inItemSet($org, $itemSetId)
-                    ) {
-                        return true;
+            foreach ($chunk as $targetId) {
+                $query['property'][] = [
+                    'property' => $propertyId,
+                    'type' => 'res',
+                    'text' => $targetId,
+                    'joiner' => 'or',
+                ];
+            }
+            foreach ($this->scalarIds($query) as $id) {
+                $ids[$id] = true;
+            }
+        }
+        return array_keys($ids);
+    }
+
+    /**
+     * Read items by id in chunks, keeping only those with a large thumbnail,
+     * until $limit is reached.
+     *
+     * @return AbstractResourceEntityRepresentation[]
+     */
+    protected function hydrateWithImages(array $ids, $limit)
+    {
+        $items = [];
+        foreach (array_chunk($ids, self::HYDRATE_CHUNK) as $chunk) {
+            $query = ['id' => $chunk];
+            if ($this->siteId) {
+                $query['site_id'] = $this->siteId;
+            }
+            foreach ($this->api->search('items', $query)->getContent() as $item) {
+                if ($item->thumbnailDisplayUrl('large') !== null) {
+                    $items[] = $item;
+                    if (count($items) >= $limit) {
+                        return $items;
                     }
                 }
             }
         }
-        return false;
+        return $items;
     }
 
-    // ---- low-level helpers -------------------------------------------------
+    /** Random subset of at most $max ids. */
+    protected function sample(array $ids, $max)
+    {
+        shuffle($ids);
+        return array_slice($ids, 0, $max);
+    }
+
+    /**
+     * Run an id-only (scalar) item search and return a flat list of ids.
+     *
+     * @return int[]
+     */
+    protected function scalarIds(array $query)
+    {
+        $query['return_scalar'] = 'id';
+        return array_values(array_map('intval', $this->api->search('items', $query)->getContent()));
+    }
 
     /**
      * A window of items for a template starting at a random offset.
@@ -242,18 +341,5 @@ class HomeGraph extends AbstractHelper
             }
         }
         return null;
-    }
-
-    protected function inItemSet(AbstractResourceEntityRepresentation $resource, $itemSetId)
-    {
-        if (!method_exists($resource, 'itemSets')) {
-            return false;
-        }
-        foreach ($resource->itemSets() as $itemSet) {
-            if ($itemSet->id() == $itemSetId) {
-                return true;
-            }
-        }
-        return false;
     }
 }

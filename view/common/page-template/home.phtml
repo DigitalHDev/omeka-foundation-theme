@@ -5,7 +5,8 @@
  *   1. Hero banner (random media attached to the banner item)
  *   2. Search strip (title-contains, all types)
  *   3. Discover grid (one image-bearing item per type + live counts)
- *   4. Selected items masonry (Photographs+Documents tied to orgs in set 4211)
+ *   4. Selected items masonry (Documents/Photographs whose Event belongs to an
+ *      Organization in item set 4211)
  */
 $escape = $this->plugin('escapeHtml');
 $this->htmlElement('body')->appendAttribute('class', 'home');
@@ -68,20 +69,7 @@ foreach ($discoverTypes as $type) {
 
 // --- Selected items -------------------------------------------------------
 $selectedMax = 32; // 4 batches of 8.
-$selected = [];
-foreach ($pool as $item) {
-    if ($graph->belongsToOrgInSet($item, $orgItemSetId)) {
-        $selected[] = $item;
-        if (count($selected) >= $selectedMax) {
-            break;
-        }
-    }
-}
-// Fallback so the section is not empty if set 4211 is unavailable in this
-// environment; replace once the org item set is confirmed (open point 8.1).
-if (empty($selected)) {
-    $selected = array_slice($pool, 0, $selectedMax);
-}
+$selected = $graph->orgDescendantPool($orgItemSetId, $selectedMax);
 ?>
 
 <div class="hero-section">
@@ -125,6 +113,7 @@ if (empty($selected)) {
     </div>
 </section>
 
+<?php if ($selected): ?>
 <hr class="divider">
 
 <section class="section-container">
@@ -147,3 +136,4 @@ if (empty($selected)) {
     </div>
     <?php endif; ?>
 </section>
+<?php endif; ?>
