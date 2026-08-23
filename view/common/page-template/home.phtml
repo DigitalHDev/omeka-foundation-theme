@@ -2,7 +2,7 @@
 /**
  * Home page template (home-page-plan.md section 5). Ignores the page's blocks
  * and composes four sections from live API queries:
- *   1. Hero banner (stub image until the Banner-Image item set is wired, 8.3)
+ *   1. Hero banner (random media attached to the banner item)
  *   2. Search strip (title-contains, all types)
  *   3. Discover grid (one image-bearing item per type + live counts)
  *   4. Selected items masonry (Photographs+Documents tied to orgs in set 4211)
@@ -17,6 +17,7 @@ $typeUrl = function ($id) use ($browseUrl) {
 };
 
 $orgItemSetId = 4211; // Organizations item set scoping the "Selected items" grid.
+$bannerItemId = 4248; // Item whose attached media supply the hero banner images.
 
 // Discover categories, in mockup order.
 $discoverTypes = [
@@ -26,19 +27,29 @@ $discoverTypes = [
     ['id' => 18, 'label' => 'ארגונים'],
 ];
 
-// One shared pool of image-bearing Documents/Photographs feeds the hero,
+// One shared pool of image-bearing Documents/Photographs feeds the
 // Discover tiles and Selected items.
 $pool = $graph->imagePool(140);
 $usedSourceIds = [];
 
-// --- Hero (stub) ----------------------------------------------------------
-$heroItem = !empty($pool) ? $pool[0] : null;
+// --- Hero -----------------------------------------------------------------
+// Banner images live as attached media on item 4248; one is picked at random
+// per request.
 $heroImageUrl = null;
 $heroCaption = '';
-if ($heroItem) {
-    $usedSourceIds[] = $heroItem->id();
-    $heroImageUrl = $heroItem->thumbnailDisplayUrl('large');
-    $heroCaption = $this->ComposeResourceTitle($heroItem);
+try {
+    $bannerItem = $this->api()->read('items', $bannerItemId)->getContent();
+    $bannerMedia = array_values(array_filter($bannerItem->media(), function ($media) {
+        return (bool) $media->thumbnailDisplayUrl('large');
+    }));
+    if ($bannerMedia) {
+        $heroMedia = $bannerMedia[random_int(0, count($bannerMedia) - 1)];
+        $heroImageUrl = $heroMedia->thumbnailDisplayUrl('large');
+        $titleValue = $heroMedia->value('dcterms:title');
+        $heroCaption = $titleValue ? (string) $titleValue : '';
+    }
+} catch (\Omeka\Api\Exception\NotFoundException $e) {
+    // Banner item missing in this environment: render the hero without an image.
 }
 
 // --- Discover tiles -------------------------------------------------------
