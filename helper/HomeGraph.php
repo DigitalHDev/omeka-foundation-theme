@@ -36,9 +36,11 @@ class HomeGraph extends AbstractHelper
 
     /** Bounds for orgDescendantPool(): sample sizes and per-query clause/id chunking. */
     const SAMPLE_ORGS = 12;
-    const SAMPLE_EVENTS = 60;
+    const SAMPLE_EVENTS = 40;
     const OR_CHUNK = 50;
     const HYDRATE_CHUNK = 40;
+    /** Hard cap on items hydrated while looking for thumbnails, so a media-poor branch cannot stall the page. */
+    const CANDIDATE_CAP = 120;
 
     /** @var \Omeka\Api\Manager */
     protected $api;
@@ -58,11 +60,12 @@ class HomeGraph extends AbstractHelper
      * Live total of items for a resource template, scoped to the current site.
      *
      * @param int $templateId
+     * @param array $extra Additional query params (e.g. ['has_media' => 1]).
      * @return int
      */
-    public function typeCount($templateId)
+    public function typeCount($templateId, array $extra = [])
     {
-        $query = ['resource_template_id' => $templateId, 'limit' => 0];
+        $query = $extra + ['resource_template_id' => $templateId, 'limit' => 0];
         if ($this->siteId) {
             $query['site_id'] = $this->siteId;
         }
@@ -175,11 +178,10 @@ class HomeGraph extends AbstractHelper
             return [];
         }
         $itemIds = array_values(array_unique(array_merge(
-            $this->subjectIds($eventIds, self::TPL_DOCUMENT, self::PROP_RELATION),
-            $this->subjectIds($eventIds, self::TPL_PHOTOGRAPH, self::PROP_RELATION)
+            $this->subjectIds($eventIds, self::TPL_DOCUMENT, self::PROP_RELATION, ['has_media' => 1]),
+            $this->subjectIds($eventIds, self::TPL_PHOTOGRAPH, self::PROP_RELATION, ['has_media' => 1])
         )));
-        shuffle($itemIds);
-        return $this->hydrateWithImages($itemIds, $limit);
+        return $this->hydrateWithImages($this->sample($itemIds, self::CANDIDATE_CAP), $limit);
     }
 
     // ---- low-level helpers -------------------------------------------------
@@ -199,15 +201,17 @@ class HomeGraph extends AbstractHelper
 
     /**
      * Ids of items of a template that reference any of $targetIds through one
-     * property. Clauses are OR'd and chunked to keep single queries bounded.
+     * property. Clauses are OR'd and chunked to keep single queries bounded;
+     * consecutive same-property OR rows share one values join in core.
      *
+     * @param array $extra Additional query params (e.g. ['has_media' => 1]).
      * @return int[]
      */
-    protected function subjectIds(array $targetIds, $templateId, $propertyId)
+    protected function subjectIds(array $targetIds, $templateId, $propertyId, array $extra = [])
     {
         $ids = [];
         foreach (array_chunk($targetIds, self::OR_CHUNK) as $chunk) {
-            $query = ['resource_template_id' => $templateId];
+            $query = $extra + ['resource_template_id' => $templateId];
             if ($this->siteId) {
                 $query['site_id'] = $this->siteId;
             }
@@ -228,7 +232,9 @@ class HomeGraph extends AbstractHelper
 
     /**
      * Read items by id in chunks, keeping only those with a large thumbnail,
-     * until $limit is reached.
+     * until $limit is reached. Chunk membership is random (the caller shuffles),
+     * but the API returns each chunk in its own order, so the result is
+     * reshuffled for display.
      *
      * @return AbstractResourceEntityRepresentation[]
      */
@@ -244,11 +250,13 @@ class HomeGraph extends AbstractHelper
                 if ($item->thumbnailDisplayUrl('large') !== null) {
                     $items[] = $item;
                     if (count($items) >= $limit) {
+                        shuffle($items);
                         return $items;
                     }
                 }
             }
         }
+        shuffle($items);
         return $items;
     }
 
@@ -277,12 +285,13 @@ class HomeGraph extends AbstractHelper
      */
     protected function randomWindow($templateId, $limit)
     {
-        $count = $this->typeCount($templateId);
+        $extra = ['has_media' => 1];
+        $count = $this->typeCount($templateId, $extra);
         if ($count === 0) {
             return [];
         }
         $offset = $count > $limit ? random_int(0, $count - $limit) : 0;
-        $query = [
+        $query = $extra + [
             'resource_template_id' => $templateId,
             'limit' => $limit,
             'offset' => $offset,

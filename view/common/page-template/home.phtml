@@ -29,8 +29,8 @@ $discoverTypes = [
 ];
 
 // One shared pool of image-bearing Documents/Photographs feeds the
-// Discover tiles and Selected items.
-$pool = $graph->imagePool(140);
+// Discover tiles. Kept small: every pool item costs a thumbnail lookup.
+$pool = $graph->imagePool(60);
 $usedSourceIds = [];
 
 // --- Hero -----------------------------------------------------------------
