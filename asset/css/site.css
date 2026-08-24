@@ -399,7 +399,7 @@ main a[href^="tel:"]::after,
   max-width: 42vw;
   height: 100vh;
 
-  background-color: var(--oxide-red);
+  background-color: var(--terracota);
   color: white;
 
   z-index: 99999;
