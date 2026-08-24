@@ -22,6 +22,7 @@ $this->headLink()->prependStylesheet($this->assetUrl('css/iconfonts.css', 'Omeka
 // Design dependencies: Typekit fonts + the ported design system.
 $this->headLink()->appendStylesheet('https://use.typekit.net/zfc8qpg.css');
 $this->headLink()->appendStylesheet($this->assetUrl('css/site.css'));
+$this->headLink(['rel' => 'icon', 'href' => $this->assetUrl($this->themeSetting('favicon'))]);
 
 // Scripts. jQuery / global / Foundation come from core (prepended to run first).
 $this->headScript()->prependFile($this->assetUrl('vendor/foundation/foundation.min.js'));
