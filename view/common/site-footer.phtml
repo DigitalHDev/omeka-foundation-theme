@@ -34,7 +34,7 @@ $siteLogo = $this->assetUrl('img/logo1.png');
                 <?php endforeach; ?>
             </nav>
             <nav class="footer-links footer-links-general" aria-label="<?php echo $escape($this->translate('General information')); ?>">
-                <a href="#">אודות</a>
+                <a href="<?php echo $escape($this->url('site/page', ['page-slug' => 'about-h'], true)); ?>">אודות</a>
                 <a href="#">יצירת קשר</a>
                 <a href="#">שליחת חומרים</a>
                 <a href="#">מדיניות פרטיות</a>

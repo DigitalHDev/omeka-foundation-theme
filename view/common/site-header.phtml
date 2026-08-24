@@ -17,10 +17,12 @@ $typeUrl = function ($id) use ($browseUrl) {
     return $browseUrl . '?types[]=' . $id;
 };
 
-// TODO (page wiring): replace '#' once the About (HE), About (EN) and Contact
-// pages exist in admin. See follow-up task in the implementation notes.
-$aboutHeUrl = '#';
-$aboutEnUrl = '#';
+$pageUrl = function ($slug) {
+    return $this->url('site/page', ['page-slug' => $slug], true);
+};
+$aboutHeUrl = $pageUrl('about-h');
+$aboutEnUrl = $pageUrl('about-e');
+// TODO (page wiring): replace '#' once the Contact page exists in admin.
 $contactUrl = '#';
 
 // Default to the bundled theme logo; an admin-uploaded logo setting overrides it.
