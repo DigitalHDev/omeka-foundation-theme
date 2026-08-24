@@ -361,7 +361,7 @@ main a[href^="tel:"]::after,
   left: -33vw;
   width: 33vw;
   height: 100%;
-  background: var(--oxide-red);
+  background: var(--terracota);
   z-index: 99998;
   transition: left var(--motion-open-duration) var(--motion-open-ease);
   box-shadow: 5px 0 15px rgba(0,0,0,0.1);
@@ -399,7 +399,7 @@ main a[href^="tel:"]::after,
   max-width: 42vw;
   height: 100vh;
 
-  background-color: var(--terracota);
+  background-color: var(--oxide-red);
   color: white;
 
   z-index: 99999;
