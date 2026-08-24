@@ -19,10 +19,11 @@ $typeUrl = function ($id) use ($browseUrl) {
 
 $orgItemSetId = 4211; // Organizations item set scoping the "Selected items" grid.
 $bannerItemId = 4248; // Item whose attached media supply the hero banner images.
+$selectedMax = 32;    // 4 batches of 8.
 
 // Perf probe: ?hgdebug=N dumps stage timings as plain text and stops before
 // stage N+1, so a slow stage can be isolated on the live site.
-//   1 = pool, 2 = hero, 3 = discover tiles, 4 = selected items
+//   1 = pool, 2 = hero, 3 = discover tiles; add &selected_items=1 for stage 4
 $hgdebug = (int) $this->params()->fromQuery('hgdebug', 0);
 $hgStart = microtime(true);
 $hgStage = function ($stage, $label, $count = null) use ($hgdebug, $graph, $hgStart) {
@@ -39,6 +40,30 @@ $hgStage = function ($stage, $label, $count = null) use ($hgdebug, $graph, $hgSt
     printf("%8.3fs  == stopped after %s %s\n", microtime(true) - $hgStart, $label, $count === null ? '' : "($count)");
     exit;
 };
+
+// --- Async fragment -------------------------------------------------------
+// site.js re-requests this page with ?selected_items=1 and injects the result
+// into the masonry grid, so the first paint does not wait on the graph walk.
+// Themes cannot register routes, hence the same-page fragment.
+if ($this->params()->fromQuery('selected_items')) {
+    $selected = $graph->orgDescendantPool($orgItemSetId, $selectedMax);
+    $hgStage(4, 'selected items', count($selected));
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    header('Content-Type: text/html; charset=utf-8');
+    foreach ($selected as $item) {
+        printf(
+            '<div class="grid-item"><a href="%s" class="item-link">'
+                . '<div class="masonry-image-wrapper"><img src="%s" alt=""></div>'
+                . '<p>%s</p></a></div>',
+            $escape($item->url()),
+            $escape($item->thumbnailDisplayUrl('large')),
+            $escape($this->ComposeResourceTitle($item))
+        );
+    }
+    exit;
+}
 
 // Discover categories, in mockup order.
 $discoverTypes = [
@@ -90,10 +115,7 @@ foreach ($discoverTypes as $type) {
 }
 $hgStage(3, 'discover tiles', count($discoverTiles));
 
-// --- Selected items -------------------------------------------------------
-$selectedMax = 32; // 4 batches of 8.
-$selected = $graph->orgDescendantPool($orgItemSetId, $selectedMax);
-$hgStage(4, 'selected items', count($selected));
+$selectedUrl = $this->url(null, [], ['query' => ['selected_items' => 1]], true);
 ?>
 
 <div class="hero-section">
@@ -137,27 +159,14 @@ $hgStage(4, 'selected items', count($selected));
     </div>
 </section>
 
-<?php if ($selected): ?>
-<hr class="divider">
+<hr class="divider" id="selected-items-divider" hidden>
 
-<section class="section-container">
+<section class="section-container" id="selected-items-section" hidden>
     <h2 class="section-title">פריטים נבחרים</h2>
-    <div class="masonry-grid" data-initial="8" data-batch="8">
+    <div class="masonry-grid" data-initial="8" data-batch="8" data-src="<?php echo $escape($selectedUrl); ?>">
         <div class="grid-sizer"></div>
-        <?php foreach ($selected as $item): ?>
-        <?php $imageUrl = $item->thumbnailDisplayUrl('large'); ?>
-        <div class="grid-item">
-            <a href="<?php echo $escape($item->url()); ?>" class="item-link">
-                <div class="masonry-image-wrapper"><img src="<?php echo $escape($imageUrl); ?>" alt=""></div>
-                <p><?php echo $escape($this->ComposeResourceTitle($item)); ?></p>
-            </a>
-        </div>
-        <?php endforeach; ?>
     </div>
-    <?php if (count($selected) > 8): ?>
-    <div class="load-more-container">
+    <div class="load-more-container" hidden>
         <button id="load-more">טען עוד פריטים</button>
     </div>
-    <?php endif; ?>
 </section>
-<?php endif; ?>

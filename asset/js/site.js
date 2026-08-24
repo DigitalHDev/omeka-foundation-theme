@@ -82,7 +82,39 @@
         if (!grid || typeof Masonry === 'undefined') {
             return;
         }
+        var src = grid.getAttribute('data-src');
+        if (!src) {
+            initMasonryGrid(grid);
+            return;
+        }
+        // Tiles are fetched separately; the section stays hidden until they arrive.
+        fetch(src, { credentials: 'same-origin' })
+            .then(function (response) {
+                return response.ok ? response.text() : '';
+            })
+            .then(function (html) {
+                if (!html.trim()) {
+                    return;
+                }
+                grid.insertAdjacentHTML('beforeend', html);
+                revealSelectedItems();
+                initMasonryGrid(grid);
+            })
+            .catch(function () {
+                /* leave the section hidden */
+            });
+    }
 
+    function revealSelectedItems() {
+        ['selected-items-divider', 'selected-items-section'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.removeAttribute('hidden');
+            }
+        });
+    }
+
+    function initMasonryGrid(grid) {
         var batchSize = parseInt(grid.getAttribute('data-batch'), 10) || 8;
         var initial = parseInt(grid.getAttribute('data-initial'), 10) || batchSize;
 
@@ -114,6 +146,7 @@
             $button.closest('.load-more-container').hide();
             return;
         }
+        $button.closest('.load-more-container').removeAttr('hidden').show();
 
         $button.on('click', function () {
             var batch = pending.splice(0, batchSize);
