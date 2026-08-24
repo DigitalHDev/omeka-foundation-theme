@@ -34,10 +34,12 @@ class HomeGraph extends AbstractHelper
     const PROP_RELATION = 13;   // dcterms:relation
     const PROP_CREATOR = 501;   // ceramic:creator
 
-    /** Bounds for orgDescendantPool(): sample sizes and per-query clause/id chunking. */
-    const SAMPLE_ORGS = 12;
-    const SAMPLE_EVENTS = 40;
-    const OR_CHUNK = 50;
+    /**
+     * Bounds for orgDescendantPool(). Each reverse lookup is a single-target
+     * query (one indexed `res` clause), so these cap the number of round trips.
+     */
+    const SAMPLE_ORGS = 6;
+    const SAMPLE_EVENTS = 24;
     const HYDRATE_CHUNK = 40;
     /** Hard cap on items hydrated while looking for thumbnails, so a media-poor branch cannot stall the page. */
     const CANDIDATE_CAP = 120;
@@ -48,12 +50,34 @@ class HomeGraph extends AbstractHelper
     /** @var int|null */
     protected $siteId;
 
+    /** @var float */
+    protected $started;
+
+    /** @var array Timing marks: [seconds, label, count|null]. Read via marks(). */
+    protected $marks = [];
+
     public function __invoke()
     {
         $view = $this->getView();
         $this->api = $view->api();
         $this->siteId = isset($view->site) ? $view->site->id() : null;
+        $this->started = microtime(true);
         return $this;
+    }
+
+    /**
+     * Elapsed-time marks recorded so far, for the home page's ?hgdebug output.
+     *
+     * @return array[] Each: [seconds, label, count|null]
+     */
+    public function marks()
+    {
+        return $this->marks;
+    }
+
+    protected function mark($label, $count = null)
+    {
+        $this->marks[] = [round(microtime(true) - $this->started, 3), $label, $count];
     }
 
     /**
@@ -86,6 +110,7 @@ class HomeGraph extends AbstractHelper
             $this->randomWindow(self::TPL_DOCUMENT, $perTemplate),
             $this->randomWindow(self::TPL_PHOTOGRAPH, $perTemplate)
         );
+        $this->mark('imagePool: windows read', count($items));
 
         $withImages = [];
         foreach ($items as $item) {
@@ -94,6 +119,7 @@ class HomeGraph extends AbstractHelper
             }
         }
         shuffle($withImages);
+        $this->mark('imagePool: thumbnails checked', count($withImages));
         return $withImages;
     }
 
@@ -158,7 +184,10 @@ class HomeGraph extends AbstractHelper
      * ItemRelations::relatedByTemplate().
      *
      * Organizations and Events are sampled per request so the section varies
-     * between loads while each reverse query stays bounded.
+     * between loads. Every reverse lookup targets a single id (one indexed
+     * `res` clause, the same query shape as ItemRelations::subjects()) and each
+     * loop exits as soon as it has enough material, so the page cost stays flat
+     * no matter how big a branch of the graph is.
      *
      * @param int $itemSetId Item set holding the Organizations.
      * @param int $limit Number of image-bearing items wanted.
@@ -167,21 +196,42 @@ class HomeGraph extends AbstractHelper
     public function orgDescendantPool($itemSetId, $limit = 32)
     {
         $orgIds = $this->sample($this->orgIdsInSet($itemSetId), self::SAMPLE_ORGS);
+        $this->mark('orgs in item set', count($orgIds));
         if (!$orgIds) {
             return [];
         }
-        $eventIds = $this->sample(
-            $this->subjectIds($orgIds, self::TPL_EVENT, self::PROP_RELATION),
-            self::SAMPLE_EVENTS
-        );
+
+        $eventIds = [];
+        foreach ($orgIds as $orgId) {
+            foreach ($this->subjectIdsFor($orgId, self::TPL_EVENT, self::PROP_RELATION) as $id) {
+                $eventIds[$id] = true;
+            }
+            if (count($eventIds) >= self::SAMPLE_EVENTS) {
+                break;
+            }
+        }
+        $eventIds = $this->sample(array_keys($eventIds), self::SAMPLE_EVENTS);
+        $this->mark('events of those orgs', count($eventIds));
         if (!$eventIds) {
             return [];
         }
-        $itemIds = array_values(array_unique(array_merge(
-            $this->subjectIds($eventIds, self::TPL_DOCUMENT, self::PROP_RELATION, ['has_media' => 1]),
-            $this->subjectIds($eventIds, self::TPL_PHOTOGRAPH, self::PROP_RELATION, ['has_media' => 1])
-        )));
-        return $this->hydrateWithImages($this->sample($itemIds, self::CANDIDATE_CAP), $limit);
+
+        $itemIds = [];
+        foreach ($eventIds as $eventId) {
+            foreach ([self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH] as $tpl) {
+                foreach ($this->subjectIdsFor($eventId, $tpl, self::PROP_RELATION, ['has_media' => 1]) as $id) {
+                    $itemIds[$id] = true;
+                }
+            }
+            if (count($itemIds) >= self::CANDIDATE_CAP) {
+                break;
+            }
+        }
+        $this->mark('docs/photos with media', count($itemIds));
+
+        $selected = $this->hydrateWithImages($this->sample(array_keys($itemIds), self::CANDIDATE_CAP), $limit);
+        $this->mark('selected items hydrated', count($selected));
+        return $selected;
     }
 
     // ---- low-level helpers -------------------------------------------------
@@ -200,34 +250,25 @@ class HomeGraph extends AbstractHelper
     }
 
     /**
-     * Ids of items of a template that reference any of $targetIds through one
-     * property. Clauses are OR'd and chunked to keep single queries bounded;
-     * consecutive same-property OR rows share one values join in core.
+     * Ids of items of a template that reference one target through one property.
+     * Single-target so the values-table index is usable — same query shape as
+     * ItemRelations::subjects().
      *
      * @param array $extra Additional query params (e.g. ['has_media' => 1]).
      * @return int[]
      */
-    protected function subjectIds(array $targetIds, $templateId, $propertyId, array $extra = [])
+    protected function subjectIdsFor($targetId, $templateId, $propertyId, array $extra = [])
     {
-        $ids = [];
-        foreach (array_chunk($targetIds, self::OR_CHUNK) as $chunk) {
-            $query = $extra + ['resource_template_id' => $templateId];
-            if ($this->siteId) {
-                $query['site_id'] = $this->siteId;
-            }
-            foreach ($chunk as $targetId) {
-                $query['property'][] = [
-                    'property' => $propertyId,
-                    'type' => 'res',
-                    'text' => $targetId,
-                    'joiner' => 'or',
-                ];
-            }
-            foreach ($this->scalarIds($query) as $id) {
-                $ids[$id] = true;
-            }
+        $query = $extra + ['resource_template_id' => $templateId];
+        if ($this->siteId) {
+            $query['site_id'] = $this->siteId;
         }
-        return array_keys($ids);
+        $query['property'][] = [
+            'property' => $propertyId,
+            'type' => 'res',
+            'text' => $targetId,
+        ];
+        return $this->scalarIds($query);
     }
 
     /**

@@ -20,6 +20,26 @@ $typeUrl = function ($id) use ($browseUrl) {
 $orgItemSetId = 4211; // Organizations item set scoping the "Selected items" grid.
 $bannerItemId = 4248; // Item whose attached media supply the hero banner images.
 
+// Perf probe: ?hgdebug=N dumps stage timings as plain text and stops before
+// stage N+1, so a slow stage can be isolated on the live site.
+//   1 = pool, 2 = hero, 3 = discover tiles, 4 = selected items
+$hgdebug = (int) $this->params()->fromQuery('hgdebug', 0);
+$hgStart = microtime(true);
+$hgStage = function ($stage, $label, $count = null) use ($hgdebug, $graph, $hgStart) {
+    if (!$hgdebug || $hgdebug > $stage) {
+        return;
+    }
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    header('Content-Type: text/plain; charset=utf-8');
+    foreach ($graph->marks() as $m) {
+        printf("%8.3fs  %-30s %s\n", $m[0], $m[1], $m[2] === null ? '' : $m[2]);
+    }
+    printf("%8.3fs  == stopped after %s %s\n", microtime(true) - $hgStart, $label, $count === null ? '' : "($count)");
+    exit;
+};
+
 // Discover categories, in mockup order.
 $discoverTypes = [
     ['id' => 17, 'label' => 'אנשים'],
@@ -32,6 +52,7 @@ $discoverTypes = [
 // Discover tiles. Kept small: every pool item costs a thumbnail lookup.
 $pool = $graph->imagePool(60);
 $usedSourceIds = [];
+$hgStage(1, 'pool', count($pool));
 
 // --- Hero -----------------------------------------------------------------
 // Banner images live as attached media on item 4248; one is picked at random
@@ -52,6 +73,7 @@ try {
 } catch (\Omeka\Api\Exception\NotFoundException $e) {
     // Banner item missing in this environment: render the hero without an image.
 }
+$hgStage(2, 'hero');
 
 // --- Discover tiles -------------------------------------------------------
 $discoverTiles = [];
@@ -66,10 +88,12 @@ foreach ($discoverTypes as $type) {
         'tile' => $tile,
     ];
 }
+$hgStage(3, 'discover tiles', count($discoverTiles));
 
 // --- Selected items -------------------------------------------------------
 $selectedMax = 32; // 4 batches of 8.
 $selected = $graph->orgDescendantPool($orgItemSetId, $selectedMax);
+$hgStage(4, 'selected items', count($selected));
 ?>
 
 <div class="hero-section">
