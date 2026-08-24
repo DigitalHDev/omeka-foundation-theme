@@ -17,17 +17,13 @@ $typeUrl = function ($id) use ($browseUrl) {
     return $browseUrl . '?resource_template_id[0]=' . $id;
 };
 
-$siteLogo = $this->themeSetting('logo') ? $this->themeSettingAssetUrl('logo') : null;
+$siteLogo = $this->assetUrl('img/logo1.png');
 ?>
 <footer class="site-footer">
     <div class="footer-container">
         <div class="footer-brand">
             <a href="<?php echo $escape($site->url()); ?>" class="footer-logo-link">
-                <?php if ($siteLogo): ?>
                 <img src="<?php echo $escape($siteLogo); ?>" alt="<?php echo $escape($site->title()); ?>">
-                <?php else: ?>
-                <?php echo $escape($site->title()); ?>
-                <?php endif; ?>
             </a>
         </div>
 
