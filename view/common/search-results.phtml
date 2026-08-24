@@ -6,6 +6,7 @@
  */
 $escape = $this->plugin('escapeHtml');
 $relations = $this->ItemRelations();
+$placeholderThumb = $this->assetUrl('img/place-holder_51.png');
 
 $browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
 
@@ -114,8 +115,8 @@ $resultsTitle = $term !== ''
         <?php foreach ($results as $item): $card = $relations->cardData($item); ?>
         <div class="archive-item">
             <a href="<?php echo $escape($card['url']); ?>" class="item-link">
-                <div class="item-visual">
-                    <?php if ($card['thumb']): ?><img src="<?php echo $escape($card['thumb']); ?>" alt=""><?php endif; ?>
+                <div class="item-visual<?php echo $card['thumb'] ? '' : ' is-placeholder'; ?>">
+                    <img src="<?php echo $escape($card['thumb'] ?: $placeholderThumb); ?>" alt="">
                 </div>
                 <div class="item-metadata">
                     <div class="meta-col title-col">
