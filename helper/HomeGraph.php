@@ -38,8 +38,10 @@ class HomeGraph extends AbstractHelper
      * Bounds for orgDescendantPool(). Each reverse lookup is a single-target
      * query (one indexed `res` clause), so these cap the number of round trips.
      */
-    const SAMPLE_ORGS = 6;
-    const SAMPLE_EVENTS = 24;
+    const SAMPLE_ORGS = 8;
+    const EVENTS_PER_ORG = 3;
+    /** Total Events to draw on, shared out when the item set holds fewer than SAMPLE_ORGS orgs. */
+    const EVENT_BUDGET = 24;
     const HYDRATE_CHUNK = 40;
     /** Hard cap on items hydrated while looking for thumbnails, so a media-poor branch cannot stall the page. */
     const CANDIDATE_CAP = 120;
@@ -185,9 +187,12 @@ class HomeGraph extends AbstractHelper
      *
      * Organizations and Events are sampled per request so the section varies
      * between loads. Every reverse lookup targets a single id (one indexed
-     * `res` clause, the same query shape as ItemRelations::subjects()) and each
-     * loop exits as soon as it has enough material, so the page cost stays flat
-     * no matter how big a branch of the graph is.
+     * `res` clause, the same query shape as ItemRelations::subjects()).
+     *
+     * Results are collected into one bucket per Organization and then
+     * interleaved round-robin, so the first screenful shows as many different
+     * Organizations as possible rather than everything from whichever org
+     * happens to have the most Events.
      *
      * @param int $itemSetId Item set holding the Organizations.
      * @param int $limit Number of image-bearing items wanted.
@@ -196,40 +201,48 @@ class HomeGraph extends AbstractHelper
     public function orgDescendantPool($itemSetId, $limit = 32)
     {
         $orgIds = $this->sample($this->orgIdsInSet($itemSetId), self::SAMPLE_ORGS);
-        $this->mark('orgs in item set', count($orgIds));
+        $this->mark('orgs sampled', count($orgIds));
         if (!$orgIds) {
             return [];
         }
 
-        $eventIds = [];
+        // Oversample per org so a bucket can still fill the round-robin after
+        // duplicates and thumbnail-less items drop out.
+        $perOrg = (int) ceil($limit / count($orgIds)) * 2;
+        $eventsPerOrg = max(self::EVENTS_PER_ORG, (int) ceil(self::EVENT_BUDGET / count($orgIds)));
+
+        $buckets = [];
+        $queried = 0;
         foreach ($orgIds as $orgId) {
-            foreach ($this->subjectIdsFor($orgId, self::TPL_EVENT, self::PROP_RELATION) as $id) {
-                $eventIds[$id] = true;
+            $eventIds = $this->sample(
+                $this->subjectIdsFor($orgId, self::TPL_EVENT, self::PROP_RELATION),
+                $eventsPerOrg
+            );
+            $ids = [];
+            foreach ($eventIds as $eventId) {
+                foreach ([self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH] as $tpl) {
+                    foreach ($this->subjectIdsFor($eventId, $tpl, self::PROP_RELATION, ['has_media' => 1]) as $id) {
+                        $ids[$id] = true;
+                    }
+                    $queried++;
+                }
+                if (count($ids) >= $perOrg) {
+                    break;
+                }
             }
-            if (count($eventIds) >= self::SAMPLE_EVENTS) {
-                break;
+            if ($ids) {
+                $buckets[] = $this->sample(array_keys($ids), $perOrg);
             }
         }
-        $eventIds = $this->sample(array_keys($eventIds), self::SAMPLE_EVENTS);
-        $this->mark('events of those orgs', count($eventIds));
-        if (!$eventIds) {
+        $this->mark('orgs with items (queries)', count($buckets) . '/' . $queried);
+        if (!$buckets) {
             return [];
         }
 
-        $itemIds = [];
-        foreach ($eventIds as $eventId) {
-            foreach ([self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH] as $tpl) {
-                foreach ($this->subjectIdsFor($eventId, $tpl, self::PROP_RELATION, ['has_media' => 1]) as $id) {
-                    $itemIds[$id] = true;
-                }
-            }
-            if (count($itemIds) >= self::CANDIDATE_CAP) {
-                break;
-            }
-        }
-        $this->mark('docs/photos with media', count($itemIds));
+        $ordered = array_slice($this->roundRobin($buckets), 0, self::CANDIDATE_CAP);
+        $this->mark('candidates interleaved', count($ordered));
 
-        $selected = $this->hydrateWithImages($this->sample(array_keys($itemIds), self::CANDIDATE_CAP), $limit);
+        $selected = $this->hydrateInOrder($ordered, $limit);
         $this->mark('selected items hydrated', count($selected));
         return $selected;
     }
@@ -272,32 +285,58 @@ class HomeGraph extends AbstractHelper
     }
 
     /**
-     * Read items by id in chunks, keeping only those with a large thumbnail,
-     * until $limit is reached. Chunk membership is random (the caller shuffles),
-     * but the API returns each chunk in its own order, so the result is
-     * reshuffled for display.
+     * Interleave buckets one entry at a time (bucket order shuffled per call),
+     * so consecutive positions come from different buckets. Ids appearing in
+     * more than one bucket keep their earliest position.
+     *
+     * @param array[] $buckets
+     * @return int[]
+     */
+    protected function roundRobin(array $buckets)
+    {
+        shuffle($buckets);
+        $out = [];
+        for ($i = 0, $added = true; $added; $i++) {
+            $added = false;
+            foreach ($buckets as $bucket) {
+                if (isset($bucket[$i])) {
+                    $out[] = $bucket[$i];
+                    $added = true;
+                }
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Read items by id, then return them in the order of $ids, keeping only
+     * those with a large thumbnail, up to $limit.
      *
      * @return AbstractResourceEntityRepresentation[]
      */
-    protected function hydrateWithImages(array $ids, $limit)
+    protected function hydrateInOrder(array $ids, $limit)
     {
-        $items = [];
+        $byId = [];
         foreach (array_chunk($ids, self::HYDRATE_CHUNK) as $chunk) {
             $query = ['id' => $chunk];
             if ($this->siteId) {
                 $query['site_id'] = $this->siteId;
             }
             foreach ($this->api->search('items', $query)->getContent() as $item) {
-                if ($item->thumbnailDisplayUrl('large') !== null) {
-                    $items[] = $item;
-                    if (count($items) >= $limit) {
-                        shuffle($items);
-                        return $items;
-                    }
-                }
+                $byId[$item->id()] = $item;
             }
         }
-        shuffle($items);
+
+        $items = [];
+        foreach ($ids as $id) {
+            if (!isset($byId[$id]) || $byId[$id]->thumbnailDisplayUrl('large') === null) {
+                continue;
+            }
+            $items[] = $byId[$id];
+            if (count($items) >= $limit) {
+                break;
+            }
+        }
         return $items;
     }
 
