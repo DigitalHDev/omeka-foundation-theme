@@ -760,6 +760,11 @@ body:not(.item) #results-container.is-grid {
     max-height: 100%;
     object-fit: contain;
 }
+.is-grid .item-visual.is-placeholder img {
+    width: 200px;
+    max-width: 100%;
+    height: auto;
+}
 .is-grid .item-metadata {
     font-family: var(--font-narkiss);
     font-size: 12px;
