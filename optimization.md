@@ -1,5 +1,17 @@
 # Optimization plan: cut home + search page load from 8–10s
 
+## Status
+
+| Phase | State |
+|---|---|
+| 0 — Measure | **Complete** (2026-08-25). Probe shipped, environment diagnosed, budget measured. |
+| 1 — Environment | **Requested 2026-08-25**, awaiting the Omeka team. Needs root; nothing for us to do. |
+| 2 — Home page | **Next.** 2.1 is the largest theme-side win (~1.3s). |
+| 3 — Search page | Not started. |
+| 4 — Global cache | Not started. Storage decided: the `Settings` table. |
+
+Phases 2–4 do not depend on Phase 1 and can proceed in parallel with it.
+
 ## Context / measurements so far
 
 Live site: isolated hosting, controlled by us or changeable on request.
@@ -24,7 +36,13 @@ The async `?selected_items=1` fragment (`orgDescendantPool`) is the "2–3s for
 items to arrive": ~50 scalar id queries + 3 hydrate chunks + ~32 thumbnail
 lookups.
 
-## Root-cause hypothesis (to confirm in Phase 0)
+## Root-cause hypothesis (to confirm in Phase 0) — RESOLVED
+
+> Superseded by "Phase 0 results" below. Verdicts: **#1 dead** (MySQL is on localhost,
+> 0.04ms round trip), **#2 confirmed**, **#3 dead** (Xdebug not installed), **#4 confirmed**
+> (OPcache not installed at all). The "~3.5s unaccounted for" in the section above measured
+> out at **1.77s** of framework bootstrap once timed request-relative rather than
+> template-relative; the rest was network and TLS in the original browser measurement.
 
 ~23ms for a trivial indexed query against a 4k-item database is anomalous.
 Leading suspects, in order:
@@ -176,11 +194,28 @@ Consequences for the rest of this plan:
 - Bootstrap is stable (26ms spread) while the home page jitters by ~830ms across identical
   requests, so the variability lives in the theme's query/thumbnail work.
 
-### Phase 1 — Environment (parallel with Phases 2–3 once Phase 0 reports)
+### Phase 1 — Environment — REQUESTED 2026-08-25, awaiting the Omeka team
 
-Driven by the 0.3 findings. Likely: enable APCu so Doctrine caches metadata and
-proxies, remove Xdebug from the web pool, size OPcache, co-locate or pool the DB
-connection.
+Root-only, so it is a request rather than work we do. Sent:
+
+- `dnf install php-opcache php-pecl-apcu`
+- `/etc/php.d/10-opcache.ini`: `enable=1`, `enable_cli=0`, `memory_consumption=256`,
+  `interned_strings_buffer=16`, `max_accelerated_files=32531`, `validate_timestamps=1`,
+  `revalidate_freq=2`, and **`save_comments=1`** — this one must not be turned off, since
+  Doctrine reads its entity mapping from annotations in docblocks and stripping comments
+  would break Omeka outright.
+- `/etc/php.d/40-apcu.ini`: `apc.enabled=1`, `apc.enable_cli=0`, `apc.shm_size=64M`
+- `systemctl restart php-fpm`
+- `chown apache:apache /var/www/html/logs/*.log` — logging is enabled in `local.config.php`
+  but the files are `root:root`, so everything has been silently discarded since 2025-12-04
+
+`validate_timestamps=1` with `revalidate_freq=2` is deliberate: deployment is `git pull` on
+the host, so changes need to appear without an FPM restart.
+
+**When it lands**, re-run the probe URLs in `CLAUDE.md` and compare against the Phase 0
+budget table above. Both the bootstrap line and the PHP-side half of each theme stage should
+drop. Not requested: raising `memory_limit` from 128M (peak measured at 40MB, so it is not a
+constraint) and any FPM pool tuning (no evidence it is needed).
 
 ### Phase 2 — Home page round-trip reduction
 
@@ -196,6 +231,18 @@ saving ~1.3s, no behaviour change.
 **2.3** Reduce the id-query count in `orgDescendantPool()` — currently up to ~50
 single-target reverse lookups. Batch the per-event Document/Photograph lookups
 into one OR'd query per org instead of two per event.
+
+**2.4** *(new, from the Phase 0 probe)* Memoize the property and vocabulary lookups in
+`helper/ComposeResourceTitle.php`. Rendering four discover tiles currently costs 27 property
+lookups, 17 item hydrations and 12 custom-vocab queries (~0.2s) because the same metadata is
+re-resolved per resource. A per-request static cache keyed by property term / vocab id is
+enough; nothing about the composed output should change.
+
+**2.5** *(new, from the Phase 0 probe)* `EXPLAIN` the `typeCount()` `COUNT(*)`. It runs
+52–69ms against a 4k-item table on a database with 0.04ms round-trip latency, which is far
+slower than it should be. Do this **before** implementing the Phase 4 cache for it — if the
+cause is a missing index, caching would paper over a problem that also slows the search
+page, where the same counts drive pagination.
 
 ### Phase 3 — Search page
 
