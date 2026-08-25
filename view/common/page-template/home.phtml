@@ -40,14 +40,14 @@ if ($this->params()->fromQuery('selected_items')) {
         ob_end_clean();
     }
     header('Content-Type: text/html; charset=utf-8');
-    foreach ($selected as $item) {
+    foreach ($selected as $entry) {
         printf(
             '<div class="grid-item"><a href="%s" class="item-link">'
                 . '<div class="masonry-image-wrapper"><img src="%s" alt=""></div>'
                 . '<p>%s</p></a></div>',
-            $escape($item->url()),
-            $escape($item->thumbnailDisplayUrl('large')),
-            $escape($this->ComposeResourceTitle($item))
+            $escape($entry['item']->url()),
+            $escape($entry['imageUrl']),
+            $escape($this->ComposeResourceTitle($entry['item']))
         );
     }
     exit;
@@ -61,11 +61,12 @@ $discoverTypes = [
     ['id' => 18, 'label' => 'ארגונים'],
 ];
 
-// One shared pool of image-bearing Documents/Photographs feeds the
-// Discover tiles. Kept small: every pool item costs a thumbnail lookup.
+// One shared pool of Documents/Photographs with media feeds the Discover
+// tiles. Candidates only: discoverTile() confirms the image on the one it
+// picks, so the pool costs two windowed reads and nothing per entry.
 $pool = $graph->imagePool(60);
 $usedSourceIds = [];
-$probe->stage(1, 'pool', count($pool));
+$probe->stage(1, 'pool (candidates)', count($pool));
 
 // --- Hero -----------------------------------------------------------------
 // Banner images live as attached media on item 4248; one is picked at random

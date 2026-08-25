@@ -6,7 +6,7 @@
 |---|---|
 | 0 — Measure | **Complete** (2026-08-25). Probe shipped, environment diagnosed, budget measured. |
 | 1 — Environment | **Requested 2026-08-25**, awaiting the Omeka team. Needs root; nothing for us to do. |
-| 2 — Home page | **Next.** 2.1 is the largest theme-side win (~1.3s). |
+| 2 — Home page | **Implemented 2026-08-25** (2.1–2.4 in code, 2.5 tooling added). Awaiting the verification probe run on the host. |
 | 3 — Search page | Not started. |
 | 4 — Global cache | Not started. Storage decided: the `Settings` table. |
 
@@ -226,11 +226,38 @@ candidate it picks and skips to the next if there is no derivative. Same
 guarantee ("a tile always has an image"), ~60 lookups down to ~4–10. Expected
 saving ~1.3s, no behaviour change.
 
+> **Done.** `imagePool()` now shuffles and returns the two windows untouched;
+> `discoverTile()` walks to the type first and only then resolves the large
+> derivative, skipping the candidate if there is none. Type-walk-first is
+> deliberate: the walk rejects far more candidates than a missing derivative
+> does, so thumbnail checks land at ~1 per tile. The URL found by the check is
+> returned in the tile, so the view does not repeat the lookup.
+
 **2.2** Same treatment in `HomeGraph::hydrateInOrder()` for the async fragment.
+
+> **Done.** Hydration is now lazy per `HYDRATE_CHUNK`: the next chunk is read
+> only if the previous ones have not yet produced `$limit` items, so the usual
+> case is one chunk of 40 rather than all 120 candidate ids. Chunks are consumed
+> in `$ids` order, so the output order is unchanged. `hydrateInOrder()` and
+> `orgDescendantPool()` now return `['item' => rep, 'imageUrl' => string]`
+> entries: `thumbnailDisplayUrl()` is **not** memoized on the representation
+> (`primaryMedia()` re-runs its `findOneBy` on every call), so the fragment was
+> paying a second query per item to render the `<img>` it had already validated.
 
 **2.3** Reduce the id-query count in `orgDescendantPool()` — currently up to ~50
 single-target reverse lookups. Batch the per-event Document/Photograph lookups
 into one OR'd query per org instead of two per event.
+
+> **Done.** New `HomeGraph::subjectIdsForAny()` issues one query per
+> Organization for all of its sampled Events and both child templates, using
+> OR'd `res` rows on property 13 (core's "consecutive OR optimization" collapses
+> them into one values-table join, and `GROUP BY omeka_root.id` keeps the ids
+> distinct). Per-org queries go from `1 + 2×events` (up to 7) to 2, i.e. ~57
+> queries down to ~17 for 8 orgs. Traversal rule unchanged; recorded in
+> `Relationships.md` §4. One behavioural nuance: the old loop stopped early once
+> an org's bucket was full, so it skewed toward the first sampled Events. The
+> batched query contributes all sampled Events and then samples the union, which
+> is closer to what the docblock claims ("oversample per org").
 
 **2.4** *(new, from the Phase 0 probe)* Memoize the property and vocabulary lookups in
 `helper/ComposeResourceTitle.php`. Rendering four discover tiles currently costs 27 property
@@ -238,11 +265,40 @@ lookups, 17 item hydrations and 12 custom-vocab queries (~0.2s) because the same
 re-resolved per resource. A per-request static cache keyed by property term / vocab id is
 enough; nothing about the composed output should change.
 
+> **Done**, though the mechanism is one level up from where the plan put it. The
+> helper never resolves a property or a vocabulary itself: those queries come out
+> of core's `values()`, which builds a `ValueRepresentation` per value (each one
+> resolving its data type — hence the custom-vocab queries) and calls
+> `property()` and `isHidden()` on it. `values()` is memoized *per representation
+> object*, so the cost is paid again whenever the same entity arrives as a new
+> object — which is exactly what happens to an Event reached through several
+> Documents. So the memo is keyed by `<resourceName>:<id>`: `parts()`,
+> `templateId()`, `literal()` and `resourceValues()` each cache per resource
+> (plus term), and the Document → Event branch now recurses through `parts()`
+> rather than `eventParts()` so the Event lands in the cache. Theme view helpers
+> are shared for the whole request (`MvcListeners` registers them as factories on
+> the shared `ViewHelperManager`), so instance properties are enough; no statics.
+> The four Discover tiles are distinct resources and gain little — the win is in
+> the 32-item async fragment, where Documents share Events.
+
 **2.5** *(new, from the Phase 0 probe)* `EXPLAIN` the `typeCount()` `COUNT(*)`. It runs
 52–69ms against a 4k-item table on a database with 0.04ms round-trip latency, which is far
 slower than it should be. Do this **before** implementing the Phase 4 cache for it — if the
 cause is a missing index, caching would paper over a problem that also slows the search
 page, where the same counts drive pagination.
+
+> **Tooling added, plan pending.** `?probeexplain=N` on either probe URL prints
+> the N slowest logged `SELECT`s in full, with their bound parameters and MySQL's
+> plan. Reconstructing the statement by hand was not worth it: what the
+> paginator's count query compiles to depends on which Doctrine count walker the
+> `GROUP BY` selects. Documented in `CLAUDE.md`. Run it with `hgdebug=1`, where
+> the two `typeCount()` counts are the dominant statements now that the 60
+> thumbnail lookups are gone.
+
+### Phase 2 results (measured …)
+
+Pending: the probe re-run on the host and the `EXPLAIN` output. Numbers go here,
+against the Phase 0 budget table.
 
 ### Phase 3 — Search page
 

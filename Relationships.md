@@ -89,6 +89,13 @@ forwards, and `creatorGroups()` walks the existing Event → Person role edges f
 `parentResource()` falls back to a directly-referenced Org or Person for a Document that has
 no Event (the dashed edge in §3), since otherwise such a Document would show no parent bar.
 
+`HomeGraph::orgDescendantPool()` batches the second hop: one OR'd `res` query per
+Organization covering all of that org's sampled Events and both child templates (15 and 20),
+rather than two single-target queries per Event (`HomeGraph::subjectIdsForAny()`,
+optimization.md 2.3). The edge, its direction and the templates are unchanged — only the
+number of round trips is. Core collapses OR'd rows on one property id into a single
+values-table join, so each target is still an indexed lookup.
+
 The canonical, production-tested configuration of these edges is the
 `$secondDegreeConfigs` array in
 [view/common/resource-page-block-layout/linked-resources.phtml](view/common/resource-page-block-layout/linked-resources.phtml),

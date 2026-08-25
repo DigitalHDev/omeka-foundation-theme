@@ -17,6 +17,11 @@ use Laminas\View\Helper\AbstractHelper;
  * the PHP configuration; without it (or with a wrong one) the page renders
  * normally and nothing is disclosed.
  *
+ * Add &probeexplain=1 to EXPLAIN the slowest logged SELECTs, printing each
+ * statement in full with its bound parameters and MySQL's plan (optimization.md
+ * 2.5). Off by default, since the plain report truncates statements at 150
+ * characters and a plan is only wanted when a specific query is under suspicion.
+ *
  * N is the stage to stop after; stages are numbered per call site. The dump
  * reports every mark twice - relative to the template start and relative to
  * PHP's REQUEST_TIME_FLOAT - so the framework bootstrap that happens before the
@@ -41,6 +46,9 @@ class PerfProbe extends AbstractHelper
 
     /** @var int Requested stage to stop after; 0 = probe inactive. */
     protected $level = 0;
+
+    /** @var int How many of the slowest SELECTs to EXPLAIN; 0 = none. */
+    protected $explain = 0;
 
     /** @var float Template-relative time origin. */
     protected $start = 0.0;
@@ -84,6 +92,7 @@ class PerfProbe extends AbstractHelper
         $token = (string) $params->fromQuery('probe', '');
         if ($level > 0 && hash_equals(self::TOKEN, $token)) {
             $this->level = $level;
+            $this->explain = max(0, (int) $params->fromQuery('probeexplain', 0));
             $this->installSqlLogger();
         }
         return $this;
@@ -255,6 +264,64 @@ class PerfProbe extends AbstractHelper
         foreach ($byShape as $shape => $info) {
             printf("  %4dx %7.1fms  %s\n", $info[0], $info[1] * 1000, $shape);
             if (++$shown >= 5) {
+                break;
+            }
+        }
+
+        if ($this->explain) {
+            $this->dumpExplains($slowest, $this->explain);
+        }
+    }
+
+    /**
+     * Run EXPLAIN on the slowest logged SELECTs (&probeexplain=N).
+     *
+     * Prints the full statement, its bound parameters and MySQL's plan, so a
+     * slow query can be diagnosed without reconstructing by hand what DQL
+     * compiled to. The EXPLAIN statements themselves are logged by the same
+     * DebugStack, but the report has already been printed by then.
+     *
+     * @param array $queries Logged queries, slowest first.
+     * @param int $max How many to explain.
+     */
+    protected function dumpExplains(array $queries, $max)
+    {
+        echo "\n=== EXPLAIN: slowest selects ===\n";
+        $connection = $this->em ? $this->em->getConnection() : null;
+        if (!$connection) {
+            echo "no connection available\n";
+            return;
+        }
+        $shown = 0;
+        foreach ($queries as $q) {
+            $sql = trim(preg_replace('/\s+/', ' ', (string) $q['sql']));
+            if (stripos($sql, 'select') !== 0) {
+                continue;
+            }
+            printf("\n%7.1fms  %s\n", $q['executionMS'] * 1000, $sql);
+            if (!empty($q['params'])) {
+                printf("params: %s\n", json_encode(
+                    $q['params'],
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR
+                ));
+            }
+            try {
+                $rows = $connection
+                    ->executeQuery('EXPLAIN ' . $sql, (array) $q['params'], (array) $q['types'])
+                    ->fetchAllAssociative();
+                foreach ($rows as $i => $row) {
+                    $cells = array_map(function ($v) {
+                        return $v === null ? 'NULL' : (string) $v;
+                    }, $row);
+                    if ($i === 0) {
+                        echo '  ' . implode(' | ', array_keys($row)) . "\n";
+                    }
+                    echo '  ' . implode(' | ', $cells) . "\n";
+                }
+            } catch (\Throwable $e) {
+                printf("  EXPLAIN failed: %s\n", $e->getMessage());
+            }
+            if (++$shown >= $max) {
                 break;
             }
         }

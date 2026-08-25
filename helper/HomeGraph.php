@@ -110,8 +110,14 @@ class HomeGraph extends AbstractHelper
     }
 
     /**
-     * A shuffled pool of image-bearing Documents and Photographs, taken from a
-     * random window of the collection so the home page varies between loads.
+     * A shuffled pool of Documents and Photographs that carry media, taken from
+     * a random window of the collection so the home page varies between loads.
+     *
+     * Only `has_media=1` is enforced here. Whether an item actually has a large
+     * derivative is checked by discoverTile() on the candidate it picks: each
+     * check costs an N+1 primaryMedia() lookup (~23ms) and only a handful of
+     * pool entries are ever used, so checking all 60 up front cost ~1.3s for
+     * nothing (optimization.md 2.1).
      *
      * @param int $limit Approximate pool size.
      * @return AbstractResourceEntityRepresentation[]
@@ -123,22 +129,21 @@ class HomeGraph extends AbstractHelper
             $this->randomWindow(self::TPL_DOCUMENT, $perTemplate),
             $this->randomWindow(self::TPL_PHOTOGRAPH, $perTemplate)
         );
+        shuffle($items);
         $this->mark('imagePool: windows read', count($items));
-
-        $withImages = [];
-        foreach ($items as $item) {
-            if ($item->thumbnailDisplayUrl('large') !== null) {
-                $withImages[] = $item;
-            }
-        }
-        shuffle($withImages);
-        $this->mark('imagePool: thumbnails checked', count($withImages));
-        return $withImages;
+        return $items;
     }
 
     /**
      * Pick a Discover tile (typed resource + image) by walking up from the
-     * image-bearing pool, guaranteeing the tile always has an image.
+     * pool, guaranteeing the tile always has an image: a candidate is only
+     * accepted once its large derivative has been resolved, and a candidate
+     * without one is skipped like any other miss.
+     *
+     * The thumbnail check comes after the type walk on purpose. It is the
+     * expensive lookup (one primaryMedia() query per call), while the walk
+     * rejects far more candidates than a missing derivative does, so this
+     * order keeps the checks down to roughly one per tile.
      *
      * @param int $templateId One of TPL_DOCUMENT/EVENT/PERSON/ORGANIZATION.
      * @param AbstractResourceEntityRepresentation[] $pool From imagePool().
@@ -147,19 +152,28 @@ class HomeGraph extends AbstractHelper
      */
     public function discoverTile($templateId, array $pool, array $usedItemIds = [])
     {
+        $checked = 0;
         foreach ($pool as $item) {
             if (in_array($item->id(), $usedItemIds, true)) {
                 continue;
             }
             $typed = $this->walkToType($item, $templateId);
-            if ($typed) {
-                return [
-                    'resource' => $typed,
-                    'imageUrl' => $item->thumbnailDisplayUrl('large'),
-                    'sourceId' => $item->id(),
-                ];
+            if (!$typed) {
+                continue;
             }
+            $checked++;
+            $imageUrl = $item->thumbnailDisplayUrl('large');
+            if ($imageUrl === null) {
+                continue;
+            }
+            $this->mark("discoverTile $templateId: matched", "$checked thumbnails checked");
+            return [
+                'resource' => $typed,
+                'imageUrl' => $imageUrl,
+                'sourceId' => $item->id(),
+            ];
         }
+        $this->mark("discoverTile $templateId: no match", "$checked thumbnails checked");
         return null;
     }
 
@@ -197,8 +211,10 @@ class HomeGraph extends AbstractHelper
      * ItemRelations::relatedByTemplate().
      *
      * Organizations and Events are sampled per request so the section varies
-     * between loads. Every reverse lookup targets a single id (one indexed
-     * `res` clause, the same query shape as ItemRelations::subjects()).
+     * between loads. The Org <- Event hop is a single-target reverse lookup
+     * (the same query shape as ItemRelations::subjects()); the Event <-
+     * Doc/Photo hop is batched into one query per Organization by
+     * subjectIdsForAny() (optimization.md 2.3).
      *
      * Results are collected into one bucket per Organization and then
      * interleaved round-robin, so the first screenful shows as many different
@@ -207,7 +223,7 @@ class HomeGraph extends AbstractHelper
      *
      * @param int $itemSetId Item set holding the Organizations.
      * @param int $limit Number of image-bearing items wanted.
-     * @return AbstractResourceEntityRepresentation[]
+     * @return array[] Each: ['item' => rep, 'imageUrl' => string]
      */
     public function orgDescendantPool($itemSetId, $limit = 32)
     {
@@ -229,20 +245,21 @@ class HomeGraph extends AbstractHelper
                 $this->subjectIdsFor($orgId, self::TPL_EVENT, self::PROP_RELATION),
                 $eventsPerOrg
             );
-            $ids = [];
-            foreach ($eventIds as $eventId) {
-                foreach ([self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH] as $tpl) {
-                    foreach ($this->subjectIdsFor($eventId, $tpl, self::PROP_RELATION, ['has_media' => 1]) as $id) {
-                        $ids[$id] = true;
-                    }
-                    $queried++;
-                }
-                if (count($ids) >= $perOrg) {
-                    break;
-                }
+            $queried++;
+            if (!$eventIds) {
+                continue;
             }
+            // One query per Organization for all of its sampled Events and both
+            // child templates, instead of two per Event.
+            $ids = $this->subjectIdsForAny(
+                $eventIds,
+                [self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH],
+                self::PROP_RELATION,
+                ['has_media' => 1]
+            );
+            $queried++;
             if ($ids) {
-                $buckets[] = $this->sample(array_keys($ids), $perOrg);
+                $buckets[] = $this->sample($ids, $perOrg);
             }
         }
         $this->mark('orgs with items (queries)', count($buckets) . '/' . $queried);
@@ -296,6 +313,50 @@ class HomeGraph extends AbstractHelper
     }
 
     /**
+     * Ids of items of any of several templates that reference any of several
+     * targets through one property - the batched form of subjectIdsFor().
+     *
+     * The property rows share one numeric property id and are OR'd, which the
+     * core adapter collapses into a single values-table join with OR'd
+     * `valueResource` equalities (its "consecutive OR optimization" in
+     * AbstractResourceEntityAdapter::buildPropertyQuery()). So this stays one
+     * query with one indexed lookup per target, and the `GROUP BY
+     * omeka_root.id` that AbstractEntityAdapter::search() always adds keeps the
+     * ids distinct.
+     *
+     * The traversal rule is unchanged: same property, same direction, same
+     * templates as the per-target calls this replaces.
+     *
+     * @param int[] $targetIds
+     * @param int[] $templateIds
+     * @param int $propertyId
+     * @param array $extra Additional query params (e.g. ['has_media' => 1]).
+     * @return int[]
+     */
+    protected function subjectIdsForAny(array $targetIds, array $templateIds, $propertyId, array $extra = [])
+    {
+        if (!$targetIds || !$templateIds) {
+            return [];
+        }
+        $query = $extra + ['resource_template_id' => $templateIds];
+        if ($this->siteId) {
+            $query['site_id'] = $this->siteId;
+        }
+        foreach (array_values($targetIds) as $i => $targetId) {
+            $row = [
+                'property' => $propertyId,
+                'type' => 'res',
+                'text' => $targetId,
+            ];
+            if ($i > 0) {
+                $row['joiner'] = 'or';
+            }
+            $query['property'][] = $row;
+        }
+        return $this->scalarIds($query);
+    }
+
+    /**
      * Interleave buckets one entry at a time (bucket order shuffled per call),
      * so consecutive positions come from different buckets. Ids appearing in
      * more than one bucket keep their earliest position.
@@ -320,35 +381,48 @@ class HomeGraph extends AbstractHelper
     }
 
     /**
-     * Read items by id, then return them in the order of $ids, keeping only
-     * those with a large thumbnail, up to $limit.
+     * Read items by id and return the first $limit of them, in the order of
+     * $ids, that have a large thumbnail.
      *
-     * @return AbstractResourceEntityRepresentation[]
+     * Hydration is lazy per chunk: the next chunk is read only if the previous
+     * ones have not yet produced $limit items, so the usual case is one chunk
+     * of HYDRATE_CHUNK rather than all CANDIDATE_CAP ids (optimization.md 2.2).
+     * Chunks follow $ids order and are consumed in order, so the result order
+     * is the same as hydrating everything up front.
+     *
+     * Each entry carries the URL found during the check, because
+     * thumbnailDisplayUrl() is not memoized on the representation: calling it
+     * again in the view would repeat the primaryMedia() query per item.
+     *
+     * @return array[] Each: ['item' => rep, 'imageUrl' => string]
      */
     protected function hydrateInOrder(array $ids, $limit)
     {
-        $byId = [];
+        $tiles = [];
         foreach (array_chunk($ids, self::HYDRATE_CHUNK) as $chunk) {
             $query = ['id' => $chunk];
             if ($this->siteId) {
                 $query['site_id'] = $this->siteId;
             }
+            $byId = [];
             foreach ($this->api->search('items', $query)->getContent() as $item) {
                 $byId[$item->id()] = $item;
             }
-        }
-
-        $items = [];
-        foreach ($ids as $id) {
-            if (!isset($byId[$id]) || $byId[$id]->thumbnailDisplayUrl('large') === null) {
-                continue;
+            foreach ($chunk as $id) {
+                if (!isset($byId[$id])) {
+                    continue;
+                }
+                $imageUrl = $byId[$id]->thumbnailDisplayUrl('large');
+                if ($imageUrl === null) {
+                    continue;
+                }
+                $tiles[] = ['item' => $byId[$id], 'imageUrl' => $imageUrl];
+                if (count($tiles) >= $limit) {
+                    return $tiles;
+                }
             }
-            $items[] = $byId[$id];
-            if (count($items) >= $limit) {
-                break;
-            }
         }
-        return $items;
+        return $tiles;
     }
 
     /** Random subset of at most $max ids. */

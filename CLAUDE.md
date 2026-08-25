@@ -89,6 +89,11 @@ logger for per-stage query counts and timings, lists the slowest and most-repeat
 statements, and prints an environment block (Xdebug / OPcache / APCu state, raw ini values,
 Doctrine cache driver classes, `files/` writability, DB round-trip latency).
 
+Add `&probeexplain=N` to also `EXPLAIN` the N slowest logged `SELECT`s, printing each
+statement in full with its bound parameters and MySQL's plan. Off by default; the ordinary
+report truncates statements at 150 characters, which is fine for spotting an N+1 but not for
+diagnosing one query.
+
 Helpers that keep their own marks (`HomeGraph`) expose `marks()` and `startedAt()` and are
 merged into the timeline via `$probe->attach($helper)`.
 

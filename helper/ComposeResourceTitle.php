@@ -32,6 +32,31 @@ class ComposeResourceTitle extends AbstractHelper
     const GROUP_SHOW = 'תערוכה קבוצתית';
 
     /**
+     * Per-request memo caches, keyed by "<resourceName>:<id>" (plus the
+     * property term where relevant).
+     *
+     * The helper instance is shared for the whole request, and every read here
+     * is of immutable metadata, so the same resource is only ever resolved
+     * once. This matters because a resource reached a second time normally
+     * arrives as a *different* representation object - the Event behind two
+     * Documents, say - and each object rebuilds its own values() array, paying
+     * the property lookups and linked-resource hydrations again
+     * (optimization.md 2.4).
+     *
+     * @var array
+     */
+    protected $partsCache = [];
+
+    /** @var array */
+    protected $templateCache = [];
+
+    /** @var array */
+    protected $literalCache = [];
+
+    /** @var array */
+    protected $resourceValueCache = [];
+
+    /**
      * @param AbstractResourceEntityRepresentation $resource
      * @return string
      */
@@ -47,18 +72,24 @@ class ComposeResourceTitle extends AbstractHelper
      */
     public function parts(AbstractResourceEntityRepresentation $resource)
     {
+        $key = $this->cacheKey($resource);
+        if (isset($this->partsCache[$key])) {
+            return $this->partsCache[$key];
+        }
         switch ($this->templateId($resource)) {
-            case self::TPL_PERSON:
-            case self::TPL_ORGANIZATION:
-                return [$resource->displayTitle()];
             case self::TPL_EVENT:
-                return $this->eventParts($resource);
+                $parts = $this->eventParts($resource);
+                break;
             case self::TPL_DOCUMENT:
             case self::TPL_PHOTOGRAPH:
-                return $this->documentParts($resource);
+                $parts = $this->documentParts($resource);
+                break;
+            case self::TPL_PERSON:
+            case self::TPL_ORGANIZATION:
             default:
-                return [$resource->displayTitle()];
+                $parts = [$resource->displayTitle()];
         }
+        return $this->partsCache[$key] = $parts;
     }
 
     /**
@@ -95,7 +126,9 @@ class ComposeResourceTitle extends AbstractHelper
         $relTemplate = $rel ? $this->templateId($rel) : null;
 
         if ($relTemplate === self::TPL_EVENT) {
-            return array_merge([$docType], $this->eventParts($rel));
+            // Through parts(), not eventParts(), so an Event shared by several
+            // Documents is composed once per request.
+            return array_merge([$docType], $this->parts($rel));
         }
         if ($relTemplate === self::TPL_ORGANIZATION || $relTemplate === self::TPL_PERSON) {
             return [$docType, $doc->displayTitle(), $rel->displayTitle(), $this->literal($doc, 'dcterms:date')];
@@ -121,10 +154,20 @@ class ComposeResourceTitle extends AbstractHelper
         return implode(', ', $clean);
     }
 
+    /** Memo key for a resource: unique per entity within the request. */
+    protected function cacheKey(AbstractResourceEntityRepresentation $resource)
+    {
+        return $resource->resourceName() . ':' . $resource->id();
+    }
+
     protected function templateId(AbstractResourceEntityRepresentation $resource)
     {
-        $template = $resource->resourceTemplate();
-        return $template ? $template->id() : null;
+        $key = $this->cacheKey($resource);
+        if (!array_key_exists($key, $this->templateCache)) {
+            $template = $resource->resourceTemplate();
+            $this->templateCache[$key] = $template ? $template->id() : null;
+        }
+        return $this->templateCache[$key];
     }
 
     /**
@@ -132,8 +175,12 @@ class ComposeResourceTitle extends AbstractHelper
      */
     protected function literal(AbstractResourceEntityRepresentation $resource, $term)
     {
-        $value = $resource->value($term);
-        return $value ? trim((string) $value) : '';
+        $key = $this->cacheKey($resource) . '|' . $term;
+        if (!array_key_exists($key, $this->literalCache)) {
+            $value = $resource->value($term);
+            $this->literalCache[$key] = $value ? trim((string) $value) : '';
+        }
+        return $this->literalCache[$key];
     }
 
     /**
@@ -143,6 +190,10 @@ class ComposeResourceTitle extends AbstractHelper
      */
     protected function resourceValues(AbstractResourceEntityRepresentation $resource, $term)
     {
+        $key = $this->cacheKey($resource) . '|' . $term;
+        if (isset($this->resourceValueCache[$key])) {
+            return $this->resourceValueCache[$key];
+        }
         $resources = [];
         foreach ((array) $resource->value($term, ['all' => true]) as $value) {
             $linked = $value->valueResource();
@@ -150,7 +201,7 @@ class ComposeResourceTitle extends AbstractHelper
                 $resources[] = $linked;
             }
         }
-        return $resources;
+        return $this->resourceValueCache[$key] = $resources;
     }
 
     /**
