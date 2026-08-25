@@ -6,7 +6,7 @@
 |---|---|
 | 0 — Measure | **Complete** (2026-08-25). Probe shipped, environment diagnosed, budget measured. |
 | 1 — Environment | **Requested 2026-08-25**, awaiting the Omeka team. Needs root; nothing for us to do. |
-| 2 — Home page | **Implemented 2026-08-25** (2.1–2.4 in code, 2.5 tooling added). Awaiting the verification probe run on the host. |
+| 2 — Home page | **2.1 / 2.2 / 2.4 landed 2026-08-25**, ~0.8s off the home page. **2.3 reverted** — measured a regression. 2.5 tooling added; the `EXPLAIN` itself still to run. |
 | 3 — Search page | Not started. |
 | 4 — Global cache | Not started. Storage decided: the `Settings` table. |
 
@@ -248,16 +248,23 @@ saving ~1.3s, no behaviour change.
 single-target reverse lookups. Batch the per-event Document/Photograph lookups
 into one OR'd query per org instead of two per event.
 
-> **Done.** New `HomeGraph::subjectIdsForAny()` issues one query per
-> Organization for all of its sampled Events and both child templates, using
-> OR'd `res` rows on property 13 (core's "consecutive OR optimization" collapses
-> them into one values-table join, and `GROUP BY omeka_root.id` keeps the ids
-> distinct). Per-org queries go from `1 + 2×events` (up to 7) to 2, i.e. ~57
-> queries down to ~17 for 8 orgs. Traversal rule unchanged; recorded in
-> `Relationships.md` §4. One behavioural nuance: the old loop stopped early once
-> an org's bucket was full, so it skewed toward the first sampled Events. The
-> batched query contributes all sampled Events and then samples the union, which
-> is closer to what the docblock claims ("oversample per org").
+> **Implemented, measured, reverted (2026-08-25).** `subjectIdsForAny()` batched
+> each Organization's sampled Events into one OR'd `res` query across both child
+> templates. The query count fell as intended — the whole fragment came to 47
+> queries — but **each batched lookup cost ~615ms**: 11 executions of that shape
+> totalled 3.13s, and the fragment's SQL rose to 3.47s of 4.43s template time,
+> roughly doubling the wait it was supposed to shorten. So MySQL will not drive
+> the values join from an OR of `valueResource` equalities the way it does from a
+> single equality, and 50 cheap indexed lookups beat 10 expensive ones. Reverted
+> to the per-event form, and `HomeGraph`'s docblock now warns against retrying it
+> blind.
+>
+> Two things changed at once in the batched query — the OR'd property rows and
+> widening to `resource_template_id IN (15, 20)` — so which one MySQL choked on
+> is not yet established. `?selected_items=1&hgdebug=4&probeexplain=2` on the
+> fragment URL answers that. If it turns out to be the OR alone, merging just the
+> two templates into one query per Event is still worth ~14 queries per request,
+> but it does not ship without a fragment measurement.
 
 **2.4** *(new, from the Phase 0 probe)* Memoize the property and vocabulary lookups in
 `helper/ComposeResourceTitle.php`. Rendering four discover tiles currently costs 27 property
@@ -295,10 +302,47 @@ page, where the same counts drive pagination.
 > the two `typeCount()` counts are the dominant statements now that the 60
 > thumbnail lookups are gone.
 
-### Phase 2 results (measured …)
+### Phase 2 results (measured 2026-08-25)
 
-Pending: the probe re-run on the host and the `EXPLAIN` output. Numbers go here,
-against the Phase 0 budget table.
+Loopback, on the host, still with **no OPcache and no APCu** — Phase 1 had not landed.
+
+Home page total: **3.57–4.22s** across 5 runs, against Phase 0's 4.37–5.20s.
+
+To the discover tiles (`?hgdebug=3`), request-relative:
+
+| Stage | Phase 0 | After 2.1 / 2.4 |
+|---|---|---|
+| Framework bootstrap | 1.78s | 1.70s |
+| `imagePool` | 1.83s (0.45 windows + 1.38 thumbnails) | **0.51s** |
+| Hero | 0.13s | **0.78s** |
+| Discover tiles | 0.66s | 0.29s |
+| **Total to tiles** | **4.41s** | **3.58s** |
+| Queries / SQL time | 156 / 1.36s | **90 / 0.71s** |
+
+The 65-execution media SELECT that cost 617ms is gone from the query report entirely, so
+2.1 did what it was for. But **~0.7s of that 1.38s only moved**: the hero went from 0.13s
+to 0.78s on 6 queries and 0.039s of SQL — ~0.74s of pure PHP — and peak memory between the
+stage-1 and stage-2 dumps rises from 22MB to 38MB. The first `thumbnailDisplayUrl()` of a
+request loads the thumbnail stack and the S3FileStore module's AWS SDK, ~16MB of classes
+re-parsed from disk on every request with no opcode cache. `imagePool` used to pay that
+cold start; the hero pays it now. **So 2.1 is worth ~0.83s, not ~1.3s**, and the rest is
+Phase 1's to recover — it was never a query cost.
+
+Async fragment (`?selected_items=1&hgdebug=4`): 2.2 confirmed — 32 media SELECTs instead of
+~64, one hydrate chunk instead of three (40 candidates interleaved, not 120). 2.3 regressed
+and was reverted (above). 2.4 cannot be isolated from this dump; it is a small win by
+construction and no longer a suspected hot spot.
+
+**Still open, and now the largest theme-side items:**
+
+- `discoverTile()`'s graph walk fires 27 property lookups, 15 custom-vocab and 9 value
+  queries for four tiles. The Phase 0 note attributed these to `ComposeResourceTitle`; they
+  are actually `walkToType()` hydrating each candidate's `dcterms:relation` targets. The
+  memo added in 2.4 does not touch them.
+- `typeCount()` is unchanged at 8 executions / 288ms — Phase 4, pending the 2.5 `EXPLAIN`.
+- The ~0.7s first-thumbnail cold start and the 1.70s bootstrap are both class loading, i.e.
+  Phase 1, and together they are ~2.4s of a ~3.6s page. **Theme-side work is now the
+  minority of the home page.**
 
 ### Phase 3 — Search page
 

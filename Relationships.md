@@ -89,12 +89,12 @@ forwards, and `creatorGroups()` walks the existing Event → Person role edges f
 `parentResource()` falls back to a directly-referenced Org or Person for a Document that has
 no Event (the dashed edge in §3), since otherwise such a Document would show no parent bar.
 
-`HomeGraph::orgDescendantPool()` batches the second hop: one OR'd `res` query per
-Organization covering all of that org's sampled Events and both child templates (15 and 20),
-rather than two single-target queries per Event (`HomeGraph::subjectIdsForAny()`,
-optimization.md 2.3). The edge, its direction and the templates are unchanged — only the
-number of round trips is. Core collapses OR'd rows on one property id into a single
-values-table join, so each target is still an indexed lookup.
+Both hops in `HomeGraph::orgDescendantPool()` are **single-target** reverse lookups, one
+query per Event per child template. Batching them into one OR'd `res` query per
+Organization was implemented and reverted: the OR'd form measured ~615ms per query against
+~40ms for the single-target form (optimization.md 2.3). The edge, its direction and the
+templates are not what is at issue — this is purely how the query is shaped — but the
+per-target form is the one to keep.
 
 The canonical, production-tested configuration of these edges is the
 `$secondDegreeConfigs` array in

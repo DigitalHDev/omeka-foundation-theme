@@ -211,10 +211,12 @@ class HomeGraph extends AbstractHelper
      * ItemRelations::relatedByTemplate().
      *
      * Organizations and Events are sampled per request so the section varies
-     * between loads. The Org <- Event hop is a single-target reverse lookup
-     * (the same query shape as ItemRelations::subjects()); the Event <-
-     * Doc/Photo hop is batched into one query per Organization by
-     * subjectIdsForAny() (optimization.md 2.3).
+     * between loads. Every reverse lookup targets a single id (one indexed
+     * `res` clause, the same query shape as ItemRelations::subjects()).
+     * Batching the second hop into one OR'd query per Organization was tried
+     * and reverted: see optimization.md 2.3. Many cheap single-target lookups
+     * beat one OR'd join here, so do not "optimize" this back without
+     * measuring the fragment first.
      *
      * Results are collected into one bucket per Organization and then
      * interleaved round-robin, so the first screenful shows as many different
@@ -245,21 +247,20 @@ class HomeGraph extends AbstractHelper
                 $this->subjectIdsFor($orgId, self::TPL_EVENT, self::PROP_RELATION),
                 $eventsPerOrg
             );
-            $queried++;
-            if (!$eventIds) {
-                continue;
+            $ids = [];
+            foreach ($eventIds as $eventId) {
+                foreach ([self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH] as $tpl) {
+                    foreach ($this->subjectIdsFor($eventId, $tpl, self::PROP_RELATION, ['has_media' => 1]) as $id) {
+                        $ids[$id] = true;
+                    }
+                    $queried++;
+                }
+                if (count($ids) >= $perOrg) {
+                    break;
+                }
             }
-            // One query per Organization for all of its sampled Events and both
-            // child templates, instead of two per Event.
-            $ids = $this->subjectIdsForAny(
-                $eventIds,
-                [self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH],
-                self::PROP_RELATION,
-                ['has_media' => 1]
-            );
-            $queried++;
             if ($ids) {
-                $buckets[] = $this->sample($ids, $perOrg);
+                $buckets[] = $this->sample(array_keys($ids), $perOrg);
             }
         }
         $this->mark('orgs with items (queries)', count($buckets) . '/' . $queried);
@@ -309,50 +310,6 @@ class HomeGraph extends AbstractHelper
             'type' => 'res',
             'text' => $targetId,
         ];
-        return $this->scalarIds($query);
-    }
-
-    /**
-     * Ids of items of any of several templates that reference any of several
-     * targets through one property - the batched form of subjectIdsFor().
-     *
-     * The property rows share one numeric property id and are OR'd, which the
-     * core adapter collapses into a single values-table join with OR'd
-     * `valueResource` equalities (its "consecutive OR optimization" in
-     * AbstractResourceEntityAdapter::buildPropertyQuery()). So this stays one
-     * query with one indexed lookup per target, and the `GROUP BY
-     * omeka_root.id` that AbstractEntityAdapter::search() always adds keeps the
-     * ids distinct.
-     *
-     * The traversal rule is unchanged: same property, same direction, same
-     * templates as the per-target calls this replaces.
-     *
-     * @param int[] $targetIds
-     * @param int[] $templateIds
-     * @param int $propertyId
-     * @param array $extra Additional query params (e.g. ['has_media' => 1]).
-     * @return int[]
-     */
-    protected function subjectIdsForAny(array $targetIds, array $templateIds, $propertyId, array $extra = [])
-    {
-        if (!$targetIds || !$templateIds) {
-            return [];
-        }
-        $query = $extra + ['resource_template_id' => $templateIds];
-        if ($this->siteId) {
-            $query['site_id'] = $this->siteId;
-        }
-        foreach (array_values($targetIds) as $i => $targetId) {
-            $row = [
-                'property' => $propertyId,
-                'type' => 'res',
-                'text' => $targetId,
-            ];
-            if ($i > 0) {
-                $row['joiner'] = 'or';
-            }
-            $query['property'][] = $row;
-        }
         return $this->scalarIds($query);
     }
 
