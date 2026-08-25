@@ -115,6 +115,51 @@ Timings, server-side over loopback:
 | **Theme's own work** | **2.6–3.4s** |
 | Search results (`?types[]=17`), external 4.4s less ~1s network | ~3.4s server-side |
 
+Home page budget from the probe (`?hgdebug=3`), request-relative:
+
+| Stage | Wall | Queries | SQL time | Share |
+|---|---|---|---|---|
+| Framework bootstrap | 1.78s | — | — | 40% |
+| `imagePool` window reads | 0.45s | ~10 | ~0.23s | 10% |
+| `imagePool` thumbnail checks | **1.38s** | 60 | 0.55s | **31%** |
+| Hero | 0.13s | 6 | 0.03s | 3% |
+| Discover tiles | 0.66s | 80 | 0.55s | 15% |
+| **Total to tiles** | **4.41s** | **156** | **1.36s** | |
+
+Peak memory 40MB against a 128M limit. `SELECT 1` round trip: median **0.04ms**, so query
+cost is real execution time, not connection overhead.
+
+Notes from the query report:
+
+- The N+1 is confirmed: **65 executions of the same media SELECT, 617ms**, i.e.
+  `primaryMedia()` issuing a `findOneBy` per item. At ~9ms of SQL per item inside a stage
+  costing ~23ms per item, roughly **half the thumbnail cost is PHP-side** (hydrating each
+  media entity into a representation) — so Phase 1 and Phase 2.1 both bite on this stage.
+- Overall, 1.36s of the 2.63s of theme work is SQL; the remaining ~1.27s is PHP execution.
+
+**New findings, not in the original plan:**
+
+- **`typeCount()` counts are expensive.** 8 executions totalling 287ms, 52–69ms each — two
+  inside `imagePool`, four for the discover tiles. On a 4k-item table that is far slower
+  than it should be; the subquery with its `resource`/`item` joins and visibility filter is
+  the suspect. Already a Phase 4 cache target; now quantified at ~0.3s recoverable. Worth
+  an `EXPLAIN` before assuming caching is the only answer.
+- **`ComposeResourceTitle` re-resolves metadata per resource.** The discover-tiles stage
+  fires 27 property lookups, 17 item hydrations and 12 custom-vocab queries to render
+  **four tiles** (~0.2s). Memoizing the property/vocabulary lookups is a small, isolated
+  win that belongs alongside Phase 2.
+- The Comment module issues 3 queries on the home page although nothing there shows
+  comments (~25ms). Low priority, but pure waste.
+
+**Expected wins:**
+
+| Change | Saving | Effort |
+|---|---|---|
+| Phase 1 — OPcache + APCu | 1.78s bootstrap, plus a share of the ~1.27s PHP-side theme time | one request, no code |
+| Phase 2.1 — defer thumbnail checks to `discoverTile()` | ~1.3s | small |
+| Phase 4 — cache `typeCount()` | ~0.3s | medium |
+| New — memoize `ComposeResourceTitle` metadata | ~0.2s | small |
+
 Root-cause hypotheses: **#1 remote MySQL — dead. #2 Doctrine ArrayCache — confirmed.
 #3 Xdebug — dead. #4 OPcache — confirmed, and absent rather than merely disabled.**
 
