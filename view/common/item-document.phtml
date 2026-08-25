@@ -1,0 +1,222 @@
+<?php
+/**
+ * Redesigned Document (15) / Photograph (20) item page (Designs/item-child.html).
+ * Rendered from view/omeka/site/item/show.phtml for those templates only; the
+ * page chrome (header/footer) comes from view/layout/layout.phtml.
+ *
+ * The results grid holds the item's OWN media files, not second-degree
+ * resources — the "parent" here is the Event the item belongs to, shown in the
+ * back-link bar above the hero.
+ *
+ * @var \Omeka\Api\Representation\ItemRepresentation $item
+ */
+$escape = $this->plugin('escapeHtml');
+// Not "item": .item .item-hero-grid / .item .hero-title in site.css restyle the
+// full-size hero, which the condensed child layout must not inherit.
+$this->htmlElement('body')->appendAttribute('class', 'item-child');
+
+$relations = $this->ItemRelations();
+
+$templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
+$isPhotograph = $templateId === OmekaTheme\Helper\ItemRelations::TPL_PHOTOGRAPH;
+$typeLabel = $isPhotograph ? 'צילומים' : 'מסמכים';
+
+$heroImage = $item->thumbnailDisplayUrl('large');
+$fileLink = $relations->primaryFileLink($item);
+$description = $item->value('dcterms:description');
+$date = $item->value('dcterms:date');
+
+// Static hero chips: what kind of thing this is, and the domain it belongs to.
+$chips = [];
+foreach (['dcterms:type', 'cidoc:P19i_was_made_for'] as $term) {
+    foreach ((array) $item->value($term, ['all' => true]) as $value) {
+        $chip = trim((string) $value);
+        if ($chip !== '' && !in_array($chip, $chips, true)) {
+            $chips[] = $chip;
+        }
+    }
+}
+
+$parent = $relations->parentResource($item);
+$creatorGroups = $relations->creatorGroups($item);
+$tiles = $relations->mediaTiles($item);
+
+// Expandable "show more" details drawer. Each entry renders only when present.
+// bibo:uri is handled separately so it can use the .external-links treatment.
+$detailGroups = $isPhotograph
+    ? [
+        ['label' => 'יוצר/ת', 'term' => 'ceramic:creator'],
+        ['label' => 'מספר מזהה', 'term' => 'dcterms:identifier'],
+        ['label' => 'ארגונים מוזכרים', 'term' => 'ceramic:mentionedOrganization'],
+        ['label' => 'א/נשים מוזכרים', 'term' => 'ceramic:mentionedPerson'],
+        ['label' => 'אירועים מוזכרים', 'term' => 'ceramic:mentionedEvent'],
+    ]
+    : [
+        ['label' => 'מו"ל', 'term' => 'ceramic:publisher'],
+        ['label' => 'כותב/ת', 'term' => 'ceramic:writer'],
+        ['label' => 'עורך/ת', 'term' => 'ceramic:editor'],
+        ['label' => 'צלם/ת', 'term' => 'ceramic:photographer'],
+        ['label' => 'מעצב/ת', 'term' => 'ceramic:designer'],
+        ['label' => 'זכויות יוצרים', 'term' => 'dcterms:rights'],
+        ['label' => 'ארגונים מוזכרים', 'term' => 'ceramic:mentionedOrganization'],
+        ['label' => 'א/נשים מוזכרים', 'term' => 'ceramic:mentionedPerson'],
+        ['label' => 'אירועים מוזכרים', 'term' => 'ceramic:mentionedEvent'],
+    ];
+$detailRows = [];
+foreach ($detailGroups as $group) {
+    $values = $item->value($group['term'], ['all' => true]);
+    if ($values) {
+        $detailRows[] = ['label' => $group['label'], 'values' => $values];
+    }
+}
+$externalLinks = $item->value('bibo:uri', ['all' => true]);
+$hasDetails = $detailRows || $externalLinks;
+?>
+
+<?php if ($parent): ?>
+<div class="item-parent-bar section-container">
+    <a href="<?php echo $escape($parent->url()); ?>" class="item-parent-link">
+        <i class="ph-light ph-arrow-right"></i>
+        <span>חזרה אל: <?php echo $escape($parent->displayTitle()); ?></span>
+    </a>
+</div>
+<?php endif; ?>
+
+<section class="section-container item-hero-grid condensed">
+    <?php if ($heroImage): ?>
+    <div class="hero-visual small-thumb">
+        <?php if ($fileLink): ?>
+        <a href="<?php echo $escape($fileLink['url']); ?>" target="_blank" rel="noopener" class="hero-file-link">
+            <img src="<?php echo $escape($heroImage); ?>" alt="<?php echo $escape($item->displayTitle()); ?>">
+            <span class="hero-file-indicator">
+                <i class="ph-light ph-file-arrow-up"></i>
+                <span><?php echo $escape($fileLink['label']); ?></span>
+            </span>
+        </a>
+        <?php else: ?>
+        <img src="<?php echo $escape($heroImage); ?>" alt="<?php echo $escape($item->displayTitle()); ?>">
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <div class="hero-text">
+        <p class="hero-label"><?php echo $escape($typeLabel); ?></p>
+        <h1 class="hero-title"><?php echo $escape($item->displayTitle()); ?></h1>
+        <?php if ($date): ?>
+        <p class="hero-dates"><?php echo $escape((string) $date); ?></p>
+        <?php endif; ?>
+        <?php if ($chips): ?>
+        <p class="hero-anchors hero-anchors-static" aria-label="סוג פריט">
+            <?php foreach ($chips as $chip): ?>
+            <span class="hero-anchor-static-item"><?php echo $escape($chip); ?></span>
+            <?php endforeach; ?>
+        </p>
+        <?php endif; ?>
+        <?php if ($description): ?>
+        <div class="hero-description">
+            <p><?php echo $escape((string) $description); ?></p>
+        </div>
+        <?php endif; ?>
+
+        <?php foreach ($creatorGroups as $group): ?>
+        <div class="creators-sidebar-wrap">
+            <?php if ($group['label'] !== ''): ?>
+            <h3 class="creators-mini-header"><?php echo $escape($group['label']); ?></h3>
+            <?php endif; ?>
+            <div class="creators-link-cloud">
+                <?php foreach ($group['people'] as $person): ?>
+                <a href="<?php echo $escape($person->url()); ?>"><?php echo $escape($person->displayTitle()); ?></a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endforeach; ?>
+
+        <?php if ($hasDetails): ?>
+        <div id="item-details-drawer" class="details-closed">
+            <?php if ($externalLinks): ?>
+            <div class="external-links">
+                <?php foreach ($externalLinks as $value) { echo $value->asHtml(); } ?>
+            </div>
+            <?php endif; ?>
+            <?php foreach ($detailRows as $row): ?>
+            <p class="item-type-grid"><?php echo $escape($row['label']); ?></p>
+            <?php foreach ($row['values'] as $value): ?>
+            <p class="item-name"><?php echo $value->asHtml(); ?></p>
+            <?php endforeach; ?>
+            <?php endforeach; ?>
+        </div>
+        <button id="toggle-item-details" class="details-toggle-btn" aria-expanded="false">
+            להציג עוד +
+        </button>
+        <?php endif; ?>
+    </div>
+</section>
+
+<?php if ($tiles): ?>
+<hr class="group-divider">
+
+<section class="section-container" id="related-items">
+    <div class="view-controls">
+        <h3 class="related-title">פריטים בקטלוג</h3>
+        <div class="view-controls-actions">
+            <div class="switcher-buttons">
+                <button id="grid-view-btn" class="active" aria-label="תצוגת רשת"><i class="ph-light ph-squares-four"></i></button>
+                <button id="list-view-btn" aria-label="תצוגת רשימה"><i class="ph-light ph-list"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="results-container" class="is-grid">
+        <?php /* installation-gallery-section carries the list-mode gallery CSS in site.css. */ ?>
+        <div class="result-section installation-gallery-section">
+            <div class="group-content gallery-content">
+                <?php foreach ($tiles as $tile): ?>
+                <?php if (!$tile['thumb']) { continue; } ?>
+                <div class="gallery-item<?php echo $tile['kind'] === 'video' ? ' gallery-item-video' : ''; ?>">
+                    <button type="button" class="gallery-thumb-btn"
+                        data-lightbox-kind="<?php echo $escape($tile['kind']); ?>"
+                        data-lightbox-src="<?php echo $escape($tile['kind'] === 'video' ? $tile['embed'] : $tile['full']); ?>"
+                        <?php if ($tile['kind'] === 'image'): ?>data-lightbox-download="<?php echo $escape($tile['full']); ?>"<?php endif; ?>
+                        data-lightbox-caption="<?php echo $escape($tile['caption']); ?>">
+                        <img src="<?php echo $escape($tile['thumb']); ?>" alt="<?php echo $escape($tile['caption']); ?>">
+                        <span class="gallery-thumb-label"><?php echo $escape($tile['caption']); ?></span>
+                    </button>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div id="image-lightbox" class="lightbox-overlay" aria-hidden="true">
+    <button type="button" class="lightbox-close" aria-label="סגירה">
+        <i class="ph-light ph-x"></i>
+    </button>
+    <button type="button" class="lightbox-download" aria-label="הורדת תמונה">
+        <i class="ph-light ph-download-simple"></i>
+    </button>
+    <button type="button" class="lightbox-nav lightbox-prev" aria-label="תמונה קודמת">
+        <i class="ph-light ph-caret-right"></i>
+    </button>
+    <figure class="lightbox-frame">
+        <img id="lightbox-image" src="" alt="">
+        <div id="lightbox-video" class="lightbox-video" hidden></div>
+        <figcaption id="lightbox-caption"></figcaption>
+    </figure>
+    <button type="button" class="lightbox-nav lightbox-next" aria-label="תמונה הבאה">
+        <i class="ph-light ph-caret-left"></i>
+    </button>
+</div>
+<?php endif; ?>
+
+<?php if ($this->getHelperPluginManager()->has('commentForm')): ?>
+<section class="section-container item-feedback-section">
+    <div class="item-feedback-card">
+        <p class="item-feedback-kicker">חסר לנו מידע?</p>
+        <p class="item-feedback-copy">אם יש לכם פרטים נוספים, הקשרים או תיקונים לגבי &ldquo;<?php echo $escape($item->displayTitle()); ?>&rdquo;, נשמח לשמוע מכם.</p>
+        <div class="item-feedback-form">
+            <?php echo $this->commentForm($item); ?>
+        </div>
+    </div>
+</section>
+<?php endif; ?>

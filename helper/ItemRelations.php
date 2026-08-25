@@ -5,10 +5,10 @@ use Laminas\View\Helper\AbstractHelper;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 
 /**
- * Connection lookups for the redesigned Person / Organization item pages
- * (Designs/item.html). Returns resource/media objects (not rendered HTML) so
- * the template can build the bespoke "related items" grid and the
- * "צילומי הצבה" media gallery.
+ * Connection lookups for the redesigned item pages: Person / Organization
+ * (Designs/item.html) and Document / Photograph / Event (Designs/item-child.html).
+ * Returns resource/media objects (not rendered HTML) so the templates can build
+ * the bespoke "related items" grid and the media gallery.
  *
  * The traversal RULES are kept identical to SecondDegreeResources and
  * view/common/resource-page-block-layout/linked-resources.phtml — this helper
@@ -19,6 +19,8 @@ use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
  *   - Org     -> Event  : Event references the Org via dcterms:relation (13).
  *   - Event   -> Document / Photograph : the Doc/Photo references the Event via
  *                         dcterms:relation (13) [reverse].
+ *   - Doc/Photo -> Event, Event -> Org : forward dcterms:relation (13); used for
+ *                         the item page's "back to" parent bar.
  *
  * Usage from a template:
  *   $relations = $this->ItemRelations();
@@ -155,7 +157,6 @@ class ItemRelations extends AbstractHelper
      */
     public function galleryTiles(AbstractResourceEntityRepresentation $item)
     {
-        $view = $this->getView();
         $events = $this->events($item);
         $sources = array_merge(
             $this->relatedByTemplate($events, self::TPL_DOCUMENT),
@@ -164,50 +165,143 @@ class ItemRelations extends AbstractHelper
 
         $tiles = [];
         foreach ($sources as $source) {
-            $caption = $view->ComposeResourceTitle($source);
-
-            if ($this->isVideo($source)) {
-                $embed = $this->youtubeEmbed($this->uriValue($source, 'bibo:uri'));
-                if (!$embed) {
-                    continue;
-                }
-                $tiles[] = [
-                    'kind' => 'video',
-                    'thumb' => $source->thumbnailDisplayUrl('large')
-                        ?: $source->thumbnailDisplayUrl('medium'),
-                    'full' => null,
-                    'embed' => $embed,
-                    'caption' => $caption,
-                ];
-                continue;
-            }
-
-            $mediaList = $source->media();
-            $imageMedia = [];
-            foreach ($mediaList as $media) {
-                if ($media->hasThumbnails()) {
-                    $imageMedia[] = $media;
-                }
-            }
-            $multi = count($imageMedia) > 1;
-            foreach ($imageMedia as $media) {
-                $mediaCaption = $caption;
-                if ($multi) {
-                    $title = trim((string) $media->displayTitle(''));
-                    if ($title !== '') {
-                        $mediaCaption = $caption === '' ? $title : $caption . ', ' . $title;
-                    }
-                }
-                $tiles[] = [
-                    'kind' => 'image',
-                    'thumb' => $media->thumbnailUrl('large'),
-                    'full' => $media->originalUrl() ?: $media->thumbnailUrl('large'),
-                    'embed' => null,
-                    'caption' => $mediaCaption,
-                ];
-            }
+            $tiles = array_merge($tiles, $this->tilesForSource($source));
         }
         return $tiles;
+    }
+
+    /**
+     * Gallery tiles for a single Document/Photograph's own media, in the same
+     * shape as galleryTiles(). Used by the Document item page, whose results
+     * grid shows the item's own files rather than second-degree resources.
+     *
+     * @return array[] See galleryTiles().
+     */
+    public function mediaTiles(AbstractResourceEntityRepresentation $resource)
+    {
+        return $this->tilesForSource($resource);
+    }
+
+    /**
+     * The resource shown in the item page's "back to" parent bar.
+     *
+     *  - Document / Photograph (15/20): the resource it references via
+     *    dcterms:relation (13). An Event is preferred, since that is the
+     *    canonical edge; a directly-referenced Org or Person is accepted as a
+     *    fallback (both occur in the data — see Relationships.md §3).
+     *  - Event (16): the Organization it references via dcterms:relation (13).
+     *
+     * @return AbstractResourceEntityRepresentation|null
+     */
+    public function parentResource(AbstractResourceEntityRepresentation $item)
+    {
+        $templateId = $this->templateId($item);
+        if (!in_array($templateId, [self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH, self::TPL_EVENT], true)) {
+            return null;
+        }
+
+        $wanted = $templateId === self::TPL_EVENT ? self::TPL_ORGANIZATION : self::TPL_EVENT;
+        $fallback = null;
+        foreach ((array) $item->value('dcterms:relation', ['all' => true]) as $value) {
+            $linked = $value->valueResource();
+            if (!$linked) {
+                continue;
+            }
+            if ($this->templateId($linked) === $wanted) {
+                return $linked;
+            }
+            if (!$fallback) {
+                $fallback = $linked;
+            }
+        }
+        return $templateId === self::TPL_EVENT ? null : $fallback;
+    }
+
+    /**
+     * People credited on an item, grouped by the creator-role property that
+     * links them. Feeds the ".creators-link-cloud" block.
+     *
+     * The role edges live on the Event (Event -> Person, forward), so a
+     * Document/Photograph borrows the groups of the Event it belongs to.
+     *
+     * @return array[] Each: ['label' => string, 'people' => resource[]]
+     */
+    public function creatorGroups(AbstractResourceEntityRepresentation $item)
+    {
+        if ($this->templateId($item) !== self::TPL_EVENT) {
+            $parent = $this->parentResource($item);
+            return $parent && $this->templateId($parent) === self::TPL_EVENT
+                ? $this->creatorGroups($parent)
+                : [];
+        }
+
+        $byProperty = [];
+        foreach ($item->values() as $info) {
+            $propertyId = $info['property']->id();
+            if (!in_array($propertyId, self::ROLE_PROPS, true)) {
+                continue;
+            }
+            foreach ($info['values'] as $value) {
+                $linked = $value->valueResource();
+                if ($linked && $this->templateId($linked) === self::TPL_PERSON) {
+                    $byProperty[$propertyId][$linked->id()] = $linked;
+                }
+            }
+        }
+
+        $groups = [];
+        foreach (self::ROLE_PROPS as $propertyId) {
+            if (empty($byProperty[$propertyId])) {
+                continue;
+            }
+            $groups[] = [
+                'label' => $this->roleHeading($item, $propertyId),
+                'people' => array_values($byProperty[$propertyId]),
+            ];
+        }
+        return $groups;
+    }
+
+    /**
+     * Documents and Photographs referencing the supplied Events, merged into one
+     * date-sorted list. Both templates are always traversed as a pair.
+     *
+     * @param AbstractResourceEntityRepresentation[] $events
+     * @return AbstractResourceEntityRepresentation[]
+     */
+    public function relatedDocsAndPhotos(array $events)
+    {
+        $resources = [];
+        foreach ([self::TPL_DOCUMENT, self::TPL_PHOTOGRAPH] as $templateId) {
+            foreach ($this->relatedByTemplate($events, $templateId) as $resource) {
+                $resources[$resource->id()] = $resource;
+            }
+        }
+        $resources = array_values($resources);
+        $this->sortByDate($resources);
+        return $resources;
+    }
+
+    /**
+     * Target of the hero thumbnail's "open file" affordance: the original media
+     * file, or the YouTube link for a video Document. Null when the item carries
+     * neither.
+     *
+     * @return array|null ['url' => string, 'label' => string]
+     */
+    public function primaryFileLink(AbstractResourceEntityRepresentation $resource)
+    {
+        if ($this->isVideo($resource)) {
+            $uri = $this->uriValue($resource, 'bibo:uri');
+            return $uri === '' ? null : ['url' => $uri, 'label' => 'צפייה בסרטון'];
+        }
+        foreach ($resource->media() as $media) {
+            $url = $media->originalUrl();
+            if ($url) {
+                return ['url' => $url, 'label' => 'פתיחת קובץ'];
+            }
+        }
+        return null;
     }
 
     /**
@@ -263,6 +357,59 @@ class ItemRelations extends AbstractHelper
     }
 
     // ---- low-level helpers -------------------------------------------------
+
+    /**
+     * Tiles for one Document/Photograph. Shared by galleryTiles() and
+     * mediaTiles() so the video/multi-media caption rules stay in one place.
+     *
+     * @return array[]
+     */
+    protected function tilesForSource(AbstractResourceEntityRepresentation $source)
+    {
+        $caption = $this->getView()->ComposeResourceTitle($source);
+
+        if ($this->isVideo($source)) {
+            $embed = $this->youtubeEmbed($this->uriValue($source, 'bibo:uri'));
+            if (!$embed) {
+                return [];
+            }
+            return [[
+                'kind' => 'video',
+                'thumb' => $source->thumbnailDisplayUrl('large')
+                    ?: $source->thumbnailDisplayUrl('medium'),
+                'full' => null,
+                'embed' => $embed,
+                'caption' => $caption,
+            ]];
+        }
+
+        $imageMedia = [];
+        foreach ($source->media() as $media) {
+            if ($media->hasThumbnails()) {
+                $imageMedia[] = $media;
+            }
+        }
+        $multi = count($imageMedia) > 1;
+
+        $tiles = [];
+        foreach ($imageMedia as $media) {
+            $mediaCaption = $caption;
+            if ($multi) {
+                $title = trim((string) $media->displayTitle(''));
+                if ($title !== '') {
+                    $mediaCaption = $caption === '' ? $title : $caption . ', ' . $title;
+                }
+            }
+            $tiles[] = [
+                'kind' => 'image',
+                'thumb' => $media->thumbnailUrl('large'),
+                'full' => $media->originalUrl() ?: $media->thumbnailUrl('large'),
+                'embed' => null,
+                'caption' => $mediaCaption,
+            ];
+        }
+        return $tiles;
+    }
 
     /**
      * Items of a template that reference $targetId through one property, scoped

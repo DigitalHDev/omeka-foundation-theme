@@ -76,6 +76,18 @@ intermediate node between an Organization and a Document.
 | Doc/Photo | Event / Org / Person | forward via 13, then Event's values | `HomeGraph::walkToType()` |
 | Org item set | Docs + Photos (grandchildren) | Orgs → reverse 13 → Events → reverse 13 → Docs/Photos | `HomeGraph::orgDescendantPool()` |
 | Doc | Event's domain / type | forward via 13, then Event's `cidoc:P19i_was_made_for` / `dcterms:type` | `FacetedSearch` |
+| Doc/Photo | parent Event | forward via 13, first value with template 16 | `ItemRelations::parentResource()` |
+| Event | parent Org | forward via 13, first value with template 18 | `ItemRelations::parentResource()` |
+| Event | its People, by role | forward via role props | `ItemRelations::creatorGroups()` |
+| Doc/Photo | its People, by role | parent Event, then forward via role props | `ItemRelations::creatorGroups()` |
+| Event | Docs + Photos | reverse via 13, both templates merged | `ItemRelations::relatedDocsAndPhotos()` |
+
+The last five rows feed the item-child item pages (`view/common/item-document.phtml`,
+`view/common/item-event.phtml`) — see **Item show pages** in `CLAUDE.md`. They introduce no
+new edges: `parentResource()` walks the existing Doc/Photo → Event and Event → Org edges
+forwards, and `creatorGroups()` walks the existing Event → Person role edges forwards.
+`parentResource()` falls back to a directly-referenced Org or Person for a Document that has
+no Event (the dashed edge in §3), since otherwise such a Document would show no parent bar.
 
 The canonical, production-tested configuration of these edges is the
 `$secondDegreeConfigs` array in

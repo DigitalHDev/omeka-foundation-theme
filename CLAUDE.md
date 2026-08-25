@@ -94,6 +94,43 @@ many random items per request), but it should **reuse code/logic from
 `SecondDegreeResources` where possible** rather than diverging. Do not silently
 fork its traversal rules.
 
+## Item show pages
+
+`view/omeka/site/item/show.phtml` routes by resource template id to a bespoke full-page
+partial; anything not in the table below falls through to the block-based rendering
+configured in `config/theme.ini`.
+
+| Template | Partial | Design |
+|---|---|---|
+| People (17), Organizations (18) | `view/common/item-person-org.phtml` | `Designs/item.html` |
+| Documents (15), Photographs (20) | `view/common/item-document.phtml` | `Designs/item-child.html` |
+| Events (16) | `view/common/item-event.phtml` | `Designs/item-child.html` |
+
+All three share the same chrome: a back-link parent bar, a hero, an expandable details
+drawer, a results grid with a grid/list switcher, and the `commentForm` feedback card.
+What fills the grid differs by type — Person/Org get their related Events, Documents and
+installation photos; a Document gets **its own media files** as lightbox tiles; an Event
+gets the Documents and Photographs that reference it.
+
+The item-child pages set the body class to `item-child` **only**. Adding `item` would pull
+in `.item .item-hero-grid` and `.item .hero-title` from `site.css`, which restyle the
+full-size hero and must not apply to the condensed layout.
+
+All the CSS these pages need already exists in `asset/css/site.css` (`.item-parent-bar`,
+`.item-hero-grid.condensed`, `.item-child .hero-file-link`, `.creators-link-cloud`,
+`.gallery-item`, …) and all the JS in `asset/js/site.js` (`setupItemDetails`,
+`setupViewSwitcher`, `setupLightbox`).
+
+**Not implemented:** the newer modal feedback form (`.item-feedback-open-btn` /
+`#item-feedback-modal`) from the design has no CSS in `site.css` and no JS in `site.js`;
+the pages use the inline `commentForm` card instead.
+
+`helper/ItemRelations.php` supplies the data. Beyond the Person/Org methods it exposes:
+`parentResource()` (the parent-bar target), `creatorGroups()` (People grouped by
+creator-role property), `mediaTiles()` (one resource's own files as gallery tiles),
+`relatedDocsAndPhotos()`, and `primaryFileLink()` (the hero "open file" target, or the
+YouTube link for a video Document).
+
 ## Faceted search / results page
 
 The site search and its results page are implemented **theme-side**, deliberately **not** using

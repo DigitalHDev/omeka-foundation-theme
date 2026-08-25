@@ -2,11 +2,18 @@
 $translate = $this->plugin('translate');
 $escape = $this->plugin('escapeHtml');
 
-// Person (17) and Organization (18) items use the bespoke redesigned layout
-// (Designs/item.html). All other item types keep the block-based rendering below.
+// Redesigned per-type layouts. Any other template keeps the block-based
+// rendering below.
 $currentTemplate = $item->resourceTemplate();
-if ($currentTemplate && in_array($currentTemplate->id(), [17, 18], true)) {
-    echo $this->partial('common/item-person-org', ['item' => $item]);
+$bespokePartials = [
+    17 => 'common/item-person-org',  // Person       (Designs/item.html)
+    18 => 'common/item-person-org',  // Organization (Designs/item.html)
+    15 => 'common/item-document',    // Document     (Designs/item-child.html)
+    20 => 'common/item-document',    // Photograph   (Designs/item-child.html)
+    16 => 'common/item-event',       // Event        (Designs/item-child.html)
+];
+if ($currentTemplate && isset($bespokePartials[$currentTemplate->id()])) {
+    echo $this->partial($bespokePartials[$currentTemplate->id()], ['item' => $item]);
     return;
 }
 
