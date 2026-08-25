@@ -77,6 +77,17 @@ class HomeGraph extends AbstractHelper
         return $this->marks;
     }
 
+    /**
+     * Absolute time the marks are relative to, so PerfProbe can merge them into
+     * a single request-relative timeline.
+     *
+     * @return float
+     */
+    public function startedAt()
+    {
+        return $this->started;
+    }
+
     protected function mark($label, $count = null)
     {
         $this->marks[] = [round(microtime(true) - $this->started, 3), $label, $count];

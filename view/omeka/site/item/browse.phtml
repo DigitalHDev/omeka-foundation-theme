@@ -19,7 +19,20 @@ $query = $this->params()->fromQuery();
 // ---------------------------------------------------------------------------
 $searchKeys = ['q', 'types', 'decades', 'domains', 'etypes', 'resource_template_id', 'property'];
 if (!isset($itemSet) && array_intersect($searchKeys, array_keys($query))) {
-    echo $this->partial('common/search-results', ['search' => $this->FacetedSearch()]);
+    // Perf probe: ?fsdebug=N&probe=TOKEN (see helper/PerfProbe.php). Stages:
+    //   1 = parseParams, 2 = computeResultIds, 3 = pageResults,
+    //   4 = decadeFacets, 5 = domainFacets, 6 = eventTypeFacets (6 = full run).
+    $probe = $this->PerfProbe()->begin('fsdebug');
+    $search = $this->FacetedSearch();
+    if ($probe->active()) {
+        $probe->stage(1, 'parseParams');
+        $probe->stage(2, 'computeResultIds', $search->totalCount());
+        $probe->stage(3, 'pageResults', count($search->pageResults()));
+        $probe->stage(4, 'decadeFacets', count($search->decadeFacets()));
+        $probe->stage(5, 'domainFacets', count($search->domainFacets()));
+        $probe->stage(6, 'eventTypeFacets', count($search->eventTypeFacets()));
+    }
+    echo $this->partial('common/search-results', ['search' => $search]);
     return;
 }
 

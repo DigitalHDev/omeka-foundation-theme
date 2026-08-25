@@ -53,6 +53,45 @@ This is a customized version of the Omeka S Foundation theme ("Foundation-Dev", 
   CLI-only — there is no local Omeka install or database, so the theme cannot be
   rendered locally; render/test by deploying into the VM sandbox site.
 
+## Live site and deployment
+
+- Live site: `https://benyaminiceramics.omeka.net/s/CCC-1/page/home`. The installation
+  lists two sites; **CCC-1 is the only one that counts** — ignore `/s/CCC`.
+- Despite the domain, this is **not** omeka.net shared hosting: it is an isolated host run
+  for us by the Omeka team, at `/var/www/html` on AlmaLinux 10.2 (Apache + PHP-FPM 8.3,
+  MySQL on localhost, files served from S3 via the S3FileStore module). Gil has SSH with
+  full command access as an unprivileged user; root-level changes (PHP extensions, ini
+  settings, file ownership outside the theme) are requested from the Omeka team.
+- Deployment is `git pull` on the host, so pushing to `master` ships.
+
+## Performance probes
+
+`helper/PerfProbe.php` instruments the two slow pages (optimization.md Phase 0). It is
+inert unless both a stage param and the shared token are present:
+
+| Page | URL |
+|---|---|
+| Home | `…/page/home?hgdebug=N&probe=TOKEN` |
+| Search results | `…/item?types[]=17&fsdebug=N&probe=TOKEN` |
+
+`TOKEN` is the `PerfProbe::TOKEN` constant — the only copy; rotate by editing it. Without
+it the page renders normally, which matters because the dump reports the database host and
+name and the PHP configuration.
+
+`N` is the stage to stop after, numbered per call site. Home: 1 = image pool, 2 = hero,
+3 = discover tiles, 4 = selected-items fragment (add `&selected_items=1`). Search:
+1 = parseParams, 2 = computeResultIds, 3 = pageResults, 4 = decadeFacets, 5 = domainFacets,
+6 = eventTypeFacets (6 runs everything).
+
+The dump prints each stage twice — template-relative and request-relative — so bootstrap
+time before the template appears as its own line. It installs a Doctrine `DebugStack` SQL
+logger for per-stage query counts and timings, lists the slowest and most-repeated
+statements, and prints an environment block (Xdebug / OPcache / APCu state, raw ini values,
+Doctrine cache driver classes, `files/` writability, DB round-trip latency).
+
+Helpers that keep their own marks (`HomeGraph`) expose `marks()` and `startedAt()` and are
+merged into the timeline via `$probe->attach($helper)`.
+
 ## Conventions
 
 - Templates use PHP short echo tags (`<?= ?>`).
