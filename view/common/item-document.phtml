@@ -131,8 +131,8 @@ $hasDetails = $detailRows || $externalLinks;
             <h3 class="creators-mini-header"><?php echo $escape($group['label']); ?></h3>
             <?php endif; ?>
             <div class="creators-link-cloud">
-                <?php foreach ($group['people'] as $person): ?>
-                <a href="<?php echo $escape($person->url()); ?>"><?php echo $escape($person->displayTitle()); ?></a>
+                <?php foreach ($group['agents'] as $agent): ?>
+                <a href="<?php echo $escape($agent->url()); ?>"><?php echo $escape($agent->displayTitle()); ?></a>
                 <?php endforeach; ?>
             </div>
         </div>

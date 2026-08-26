@@ -40,8 +40,11 @@ class FacetedSearch extends AbstractHelper
     const PROP_RELATION = 'dcterms:relation';
     const PROP_DOMAIN = 'cidoc:P19i_was_made_for';
 
-    /** Creator-role properties connecting an Event to People (mirror ItemRelations::ROLE_PROPS). */
-    const ROLE_PROPS = [501, 502, 518, 511, 514, 503, 500, 506, 504];
+    /**
+     * Creator-role properties connecting an Event to an Agent (Person or
+     * Organization). Exact mirror of ItemRelations::ROLE_PROPS - keep in sync.
+     */
+    const ROLE_PROPS = [501, 502, 512, 518, 511, 514, 503, 500, 506, 504];
 
     /** dcterms:type value marking the Event subtype that carries a domain. */
     const EVENT_TYPE_WITH_DOMAIN = 'אירוע';

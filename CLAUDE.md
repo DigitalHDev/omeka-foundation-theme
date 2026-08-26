@@ -221,10 +221,19 @@ All the CSS these pages need already exists in `asset/css/site.css` (`.item-pare
 the pages use the inline `commentForm` card instead.
 
 `helper/ItemRelations.php` supplies the data. Beyond the Person/Org methods it exposes:
-`parentResource()` (the parent-bar target), `creatorGroups()` (People grouped by
+`parentResource()` (the parent-bar target), `creatorGroups()` (**Agents** grouped by
 creator-role property), `mediaTiles()` (one resource's own files as gallery tiles),
 `relatedDocsAndPhotos()`, and `primaryFileLink()` (the hero "open file" target, or the
 YouTube link for a video Document).
+
+**The creators cloud carries Organizations as well as People.** The role properties in
+`ItemRelations::ROLE_PROPS` take an *Agent* — template 17 or 18 — so `creatorGroups()`
+returns both, People first then Orgs within each role group, with no visual distinction.
+Its group key is therefore **`agents`**, not `people`; both call sites
+(`item-event.phtml`, `item-document.phtml`) iterate `$group['agents']`. Symmetrically,
+`eventsByRole()` groups an Organization's Events by role the way a Person's already were,
+with the `dcterms:relation` (affiliation) Events kept as one leading *unlabeled* group and
+never duplicated into a role group. See `Relationships.md` §2–§4.
 
 ## Faceted search / results page
 

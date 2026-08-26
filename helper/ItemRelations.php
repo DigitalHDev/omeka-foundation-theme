@@ -16,7 +16,10 @@ use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
  *
  *   - Person  -> Event  : Event references the Person via a creator-role
  *                         property (ceramic:creator 501 and its sibling roles).
- *   - Org     -> Event  : Event references the Org via dcterms:relation (13).
+ *   - Org     -> Event  : Event references the Org via dcterms:relation (13)
+ *                         [affiliation/host] and/or via the same creator-role
+ *                         properties [credits] — an Organization is a valid
+ *                         value of any role property (see ROLE_PROPS).
  *   - Event   -> Document / Photograph : the Doc/Photo references the Event via
  *                         dcterms:relation (13) [reverse].
  *   - Doc/Photo -> Event, Event -> Org : forward dcterms:relation (13); used for
@@ -39,10 +42,17 @@ class ItemRelations extends AbstractHelper
     const PROP_RELATION = 13;   // dcterms:relation
 
     /**
-     * Creator-role properties connecting an Event to People. Mirrors the
-     * Event -> Person property set declared in linked-resources.phtml.
+     * Creator-role properties connecting an Event to an Agent — a Person OR an
+     * Organization. Their data type is custom vocab #1 ("Agents" = item set
+     * 868), which holds both templates, so either may be the value of any of
+     * them. This constant is the source of truth for the role set
+     * (Relationships.md §2); the list in linked-resources.phtml is legacy and
+     * unreachable for templates 15/16/17/18/20.
+     *
+     * The order below is the Event template's own declaration order and drives
+     * group order on every page that renders roles.
      */
-    const ROLE_PROPS = [501, 502, 518, 511, 514, 503, 500, 506, 504];
+    const ROLE_PROPS = [501, 502, 512, 518, 511, 514, 503, 500, 506, 504];
 
     /** Literal dcterms:type value that marks a Document as an embedded video. */
     const VIDEO_TYPE = 'וידאו';
@@ -68,13 +78,23 @@ class ItemRelations extends AbstractHelper
      * First-degree Events connected to a Person or Organization, de-duplicated
      * and sorted by dcterms:date (ascending; undated last).
      *
+     * A Person is reached through the creator-role properties only. An
+     * Organization is reached through dcterms:relation (13, affiliation/host)
+     * AND the role properties (credits) — most role-linked Orgs have no
+     * property-13 Event at all.
+     *
      * @return AbstractResourceEntityRepresentation[]
      */
     public function events(AbstractResourceEntityRepresentation $item)
     {
-        $props = $this->templateId($item) === self::TPL_PERSON
-            ? self::ROLE_PROPS
-            : [self::PROP_RELATION];
+        $templateId = $this->templateId($item);
+        if ($templateId === self::TPL_PERSON) {
+            $props = self::ROLE_PROPS;
+        } elseif ($templateId === self::TPL_ORGANIZATION) {
+            $props = array_merge([self::PROP_RELATION], self::ROLE_PROPS);
+        } else {
+            $props = [self::PROP_RELATION];
+        }
 
         $events = [];
         foreach ($props as $pid) {
@@ -109,36 +129,59 @@ class ItemRelations extends AbstractHelper
     }
 
     /**
-     * Events a Person took part in, grouped by the relationship (role) under
-     * which they are linked — not only as creator. Each group is one
-     * creator-role property that yields events, with its events sorted by date.
-     * The group label is the property label run through the translation
-     * infrastructure, so it appears in the site language.
+     * Events an Agent (Person or Organization) took part in, grouped by the
+     * relationship (role) under which they are linked — not only as creator.
+     * Each group is one creator-role property that yields events, with its
+     * events sorted by date. The group label is the property's Event-template
+     * alternate label, so it appears in the site language.
      *
-     * Organizations relate to Events through a single edge (dcterms:relation),
-     * so they return one unlabeled group.
+     * An Organization additionally relates to Events through dcterms:relation
+     * (13), which is affiliation rather than a role: those Events are returned
+     * as one leading *unlabeled* group. Role groups win — an Event reachable
+     * both ways is listed under its role only, never twice.
+     *
+     * Any other template keeps the single unlabeled group from events().
      *
      * @return array[] Each: ['label' => string, 'events' => resource[]]
      */
     public function eventsByRole(AbstractResourceEntityRepresentation $item)
     {
-        if ($this->templateId($item) !== self::TPL_PERSON) {
+        $templateId = $this->templateId($item);
+        if (!in_array($templateId, [self::TPL_PERSON, self::TPL_ORGANIZATION], true)) {
             $events = $this->events($item);
             return $events ? [['label' => '', 'events' => $events]] : [];
         }
 
         $groups = [];
+        $claimed = [];
         foreach (self::ROLE_PROPS as $pid) {
             $events = array_values($this->subjects($item->id(), self::TPL_EVENT, $pid));
             if (!$events) {
                 continue;
             }
             $this->sortByDate($events);
+            foreach ($events as $event) {
+                $claimed[$event->id()] = true;
+            }
             $groups[] = [
                 'label' => $this->roleHeading($events[0], $pid),
                 'events' => $events,
             ];
         }
+
+        if ($templateId === self::TPL_ORGANIZATION) {
+            $affiliated = [];
+            foreach ($this->subjects($item->id(), self::TPL_EVENT, self::PROP_RELATION) as $event) {
+                if (!isset($claimed[$event->id()])) {
+                    $affiliated[] = $event;
+                }
+            }
+            if ($affiliated) {
+                $this->sortByDate($affiliated);
+                array_unshift($groups, ['label' => '', 'events' => $affiliated]);
+            }
+        }
+
         return $groups;
     }
 
@@ -218,13 +261,16 @@ class ItemRelations extends AbstractHelper
     }
 
     /**
-     * People credited on an item, grouped by the creator-role property that
-     * links them. Feeds the ".creators-link-cloud" block.
+     * Agents — People and Organizations — credited on an item, grouped by the
+     * creator-role property that links them. Feeds the ".creators-link-cloud"
+     * block. Within a group, People come first, then Organizations, each in the
+     * order the values appear on the Event; the two are not distinguished
+     * visually.
      *
-     * The role edges live on the Event (Event -> Person, forward), so a
+     * The role edges live on the Event (Event -> Agent, forward), so a
      * Document/Photograph borrows the groups of the Event it belongs to.
      *
-     * @return array[] Each: ['label' => string, 'people' => resource[]]
+     * @return array[] Each: ['label' => string, 'agents' => resource[]]
      */
     public function creatorGroups(AbstractResourceEntityRepresentation $item)
     {
@@ -243,8 +289,11 @@ class ItemRelations extends AbstractHelper
             }
             foreach ($info['values'] as $value) {
                 $linked = $value->valueResource();
-                if ($linked && $this->templateId($linked) === self::TPL_PERSON) {
-                    $byProperty[$propertyId][$linked->id()] = $linked;
+                $linkedTemplate = $linked ? $this->templateId($linked) : null;
+                if ($linkedTemplate === self::TPL_PERSON) {
+                    $byProperty[$propertyId]['people'][$linked->id()] = $linked;
+                } elseif ($linkedTemplate === self::TPL_ORGANIZATION) {
+                    $byProperty[$propertyId]['orgs'][$linked->id()] = $linked;
                 }
             }
         }
@@ -254,9 +303,13 @@ class ItemRelations extends AbstractHelper
             if (empty($byProperty[$propertyId])) {
                 continue;
             }
+            $agents = array_merge(
+                array_values($byProperty[$propertyId]['people'] ?? []),
+                array_values($byProperty[$propertyId]['orgs'] ?? [])
+            );
             $groups[] = [
                 'label' => $this->roleHeading($item, $propertyId),
-                'people' => array_values($byProperty[$propertyId]),
+                'agents' => $agents,
             ];
         }
         return $groups;
