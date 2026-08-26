@@ -17,6 +17,10 @@ $this->htmlElement('body')->appendAttribute('class', 'item-child');
 
 $relations = $this->ItemRelations();
 
+// Perf probe: ?irdebug=N&probe=TOKEN (see helper/PerfProbe.php). Stages:
+//   1 = parentResource, 2 = creatorGroups, 3 = mediaTiles (3 = full run).
+$probe = $this->PerfProbe()->begin('irdebug');
+
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
 $isPhotograph = $templateId === OmekaTheme\Helper\ItemRelations::TPL_PHOTOGRAPH;
 $typeLabel = $isPhotograph ? 'צילומים' : 'מסמכים';
@@ -38,8 +42,11 @@ foreach (['dcterms:type', 'cidoc:P19i_was_made_for'] as $term) {
 }
 
 $parent = $relations->parentResource($item);
+$probe->stage(1, 'parentResource', $parent ? $parent->id() : null);
 $creatorGroups = $relations->creatorGroups($item);
+$probe->stage(2, 'creatorGroups', count($creatorGroups));
 $tiles = $relations->mediaTiles($item);
+$probe->stage(3, 'mediaTiles', count($tiles));
 
 // Expandable "show more" details drawer. Each entry renders only when present.
 // bibo:uri is handled separately so it can use the .external-links treatment.

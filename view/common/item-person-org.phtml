@@ -11,6 +11,10 @@ $this->htmlElement('body')->appendAttribute('class', 'item');
 
 $relations = $this->ItemRelations();
 
+// Perf probe: ?irdebug=N&probe=TOKEN (see helper/PerfProbe.php). Stages:
+//   1 = eventsByRole, 2 = events, 3 = documents, 4 = galleryTiles (4 = full run).
+$probe = $this->PerfProbe()->begin('irdebug');
+
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
 $typeLabel = $templateId === 18 ? 'ארגונים' : 'אנשים';
 
@@ -37,9 +41,13 @@ foreach ($detailGroups as $group) {
 // Related items: first-degree Events (grouped by the relationship/role under
 // which the person took part), second-degree Documents (publications).
 $eventGroups = $relations->eventsByRole($item);
+$probe->stage(1, 'eventsByRole', count($eventGroups));
 $events = $relations->events($item); // flat list for documents + section visibility
+$probe->stage(2, 'events', count($events));
 $documents = $relations->relatedByTemplate($events, OmekaTheme\Helper\ItemRelations::TPL_DOCUMENT);
+$probe->stage(3, 'documents', count($documents));
 $galleryTiles = $relations->galleryTiles($item);
+$probe->stage(4, 'galleryTiles', count($galleryTiles));
 
 // Hero anchor links = the distinct relationship names (translated) the person fills.
 $anchorLabels = [];

@@ -17,6 +17,10 @@ $this->htmlElement('body')->appendAttribute('class', 'item-child');
 
 $relations = $this->ItemRelations();
 
+// Perf probe: ?irdebug=N&probe=TOKEN (see helper/PerfProbe.php). Stages:
+//   1 = parentResource, 2 = creatorGroups, 3 = relatedDocsAndPhotos (3 = full run).
+$probe = $this->PerfProbe()->begin('irdebug');
+
 $heroImage = $relations->eventThumbnail($item);
 $description = $item->value('dcterms:description');
 $date = $item->value('dcterms:date');
@@ -33,8 +37,11 @@ foreach (['dcterms:type', 'cidoc:P19i_was_made_for'] as $term) {
 }
 
 $parent = $relations->parentResource($item);
+$probe->stage(1, 'parentResource', $parent ? $parent->id() : null);
 $creatorGroups = $relations->creatorGroups($item);
+$probe->stage(2, 'creatorGroups', count($creatorGroups));
 $related = $relations->relatedDocsAndPhotos([$item]);
+$probe->stage(3, 'relatedDocsAndPhotos', count($related));
 
 // Expandable "show more" details drawer. The creator-role properties are
 // deliberately absent — they are already rendered as the creators cloud.

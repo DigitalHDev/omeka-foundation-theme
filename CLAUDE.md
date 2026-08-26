@@ -78,6 +78,7 @@ It is inert unless both a stage param and the shared token are present:
 |---|---|
 | Home | `…/page/home?hgdebug=N&probe=TOKEN` |
 | Search results | `…/item?types[]=17&fsdebug=N&probe=TOKEN` |
+| Item show (any of the three partials) | `…/item/<id>?irdebug=N&probe=TOKEN` |
 
 `TOKEN` is the `PerfProbe::TOKEN` constant — the only copy; rotate by editing it. Without
 it the page renders normally, which matters because the dump reports the database host and
@@ -87,6 +88,19 @@ name and the PHP configuration.
 3 = discover tiles, 4 = selected-items fragment (add `&selected_items=1`). Search:
 1 = parseParams, 2 = computeResultIds, 3 = pageResults, 4 = decadeFacets, 5 = domainFacets,
 6 = eventTypeFacets (6 runs everything).
+
+`irdebug` is shared by all three item-show partials — a request renders exactly one of
+them, so there is no ambiguity, but the stage numbers mean different things per template:
+
+| Partial | Templates | Stages |
+|---|---|---|
+| `item-person-org.phtml` | 17, 18 | 1 = eventsByRole, 2 = events, 3 = documents, 4 = galleryTiles |
+| `item-event.phtml` | 16 | 1 = parentResource, 2 = creatorGroups, 3 = relatedDocsAndPhotos |
+| `item-document.phtml` | 15, 20 | 1 = parentResource, 2 = creatorGroups, 3 = mediaTiles |
+
+Stage 2 is the useful one in each: on a Person/Org it brackets the reverse role-property
+traversal, and on an Event/Document it brackets `creatorGroups()`, whose cost is the
+lazy-loading of each credited resource rather than queries of its own.
 
 The dump prints each stage twice — template-relative and request-relative — so bootstrap
 time before the template appears as its own line. It installs a Doctrine `DebugStack` SQL
