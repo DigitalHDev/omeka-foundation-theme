@@ -66,8 +66,13 @@ This is a customized version of the Omeka S Foundation theme ("Foundation-Dev", 
 
 ## Performance probes
 
-`helper/PerfProbe.php` instruments the two slow pages (optimization.md Phase 0). It is
-inert unless both a stage param and the shared token are present:
+`helper/PerfProbe.php` is the theme's own request profiler, built for optimization.md and
+kept afterwards. **It stays in the theme deliberately** — it is inert without the token, it
+costs nothing when unarmed, and it is the only way to see where a page's time goes on this
+host. Read `optimization.md` before using it: that file holds every measurement taken so
+far, what turned out to be true, and what turned out to be an artefact.
+
+It is inert unless both a stage param and the shared token are present:
 
 | Page | URL |
 |---|---|
@@ -95,7 +100,39 @@ report truncates statements at 150 characters, which is fine for spotting an N+1
 diagnosing one query.
 
 Helpers that keep their own marks (`HomeGraph`) expose `marks()` and `startedAt()` and are
-merged into the timeline via `$probe->attach($helper)`.
+merged into the timeline via `$probe->attach($helper)`. To instrument a new page: call
+`$this->PerfProbe()->begin('<param>')` at the top of the template, then `$probe->stage(N,
+'label', $detail)` at each point of interest — `stage()` dumps and exits when `N` matches
+the requested level, so numbering runs in template order.
+
+### Running it
+
+**Measure from the host over loopback, never from Windows** — WAN and TLS add about a
+second and hide what changed. Plain `http://127.0.0.1` 301-redirects to HTTPS, so resolve
+the real hostname to loopback instead:
+
+```
+curl -sk --max-time 120 -w '\n== total %{time_total}s ==\n' \
+  --resolve benyaminiceramics.omeka.net:443:127.0.0.1 \
+  'https://benyaminiceramics.omeka.net/s/CCC-1/page/home?hgdebug=3&probe=TOKEN'
+```
+
+Pipe through `sed -n '1,12p'` rather than `head` if you only want the timing table; `head`
+closes the pipe under curl. Do not wrap the call in `sleep`: the dump only arrives when the
+page finishes, so a foreground sleep looks like a hang.
+
+### Reading the output
+
+Columns are: `req` (seconds since `REQUEST_TIME_FLOAT`), `tpl` (since template start), `+q`
+and `q` (queries in this stage / cumulative), `+sql` and `sql` (SQL seconds, same). The
+first row is framework bootstrap — everything before the template runs. A stage that is slow
+with few queries and little SQL time is PHP work, usually class loading.
+
+**Check the environment block before trusting any number.** Two traps cost real time during
+Phase 0–2: measurements taken with no opcode cache are not comparable to current ones (they
+were ~20× slower at bootstrap), and measurements taken while the host is busy with something
+else inflate SQL times several-fold. If DB round-trip max is far above the median, the box is
+contended — re-measure later rather than optimising against it.
 
 ## Conventions
 
