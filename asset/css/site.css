@@ -857,10 +857,11 @@ body:not(.item) #results-container.is-grid {
 .result-subgroup:last-child {
   margin-bottom: 0;
 }
-/* Hero-anchor jump targets: clear the sticky utility bar (~90px) plus the
-   sticky .result-group-header so the label itself stays visible. */
+/* Hero-anchor jump targets: clear the sticky utility bar (~92px). The sticky
+   .result-group-header sits at top:0 behind it (z-index 700 vs 9999), so it
+   adds no extra obstruction. */
 .result-subgroup-header[id] {
-  scroll-margin-top: 150px;
+  scroll-margin-top: 100px;
 }
 .result-subgroup-header {
   width: 100%;
