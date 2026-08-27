@@ -1,9 +1,14 @@
 # Organizations as role-bearing agents on Events
 
-Working document for the change. The kickoff prompt for implementing it in a fresh session is
-in [org-event-relationships-prompt.md](org-event-relationships-prompt.md).
+Working document for the change. The kickoff prompt that was used to implement it is in
+[org-event-relationships-prompt.md](org-event-relationships-prompt.md).
 
-Status: **planned, not implemented.**
+Status: **implemented in commit `873cfa8` ("new relationships") and deployed.**
+
+Verified live on `/s/CCC-1/`: org 1745 (role-only, previously empty) renders a יוצר/ת group;
+org 1819 renders its three `dcterms:relation` Events (1972, 4324, 2119) in the leading
+unlabeled group, followed by the שותף/ה and יזמ/ת role groups. Leaving that leading group
+without a heading was reviewed and kept deliberately.
 
 ## Context
 
