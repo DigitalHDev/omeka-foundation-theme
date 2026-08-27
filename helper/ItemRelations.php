@@ -22,6 +22,10 @@ use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
  *                         value of any role property (see ROLE_PROPS).
  *   - Event   -> Document / Photograph : the Doc/Photo references the Event via
  *                         dcterms:relation (13) [reverse].
+ *   - Org     -> Document (own publications, Organization pages only) : the
+ *                         Document credits the Org through one of
+ *                         DIRECT_DOC_PROPS [reverse]. A first-degree edge, not
+ *                         a traversal through an Event.
  *   - Doc/Photo -> Event, Event -> Org : forward dcterms:relation (13); used for
  *                         the item page's "back to" parent bar.
  *
@@ -40,6 +44,7 @@ class ItemRelations extends AbstractHelper
     const TPL_PHOTOGRAPH = 20;
 
     const PROP_RELATION = 13;   // dcterms:relation
+    const PROP_PUBLISHER = 515; // ceramic:publisher
 
     /**
      * Creator-role properties connecting an Event to an Agent — a Person OR an
@@ -54,6 +59,24 @@ class ItemRelations extends AbstractHelper
      */
     const ROLE_PROPS = [501, 502, 512, 518, 511, 514, 503, 500, 506, 504];
 
+    /**
+     * Document -> Agent *credit* properties, used only to list an Organization's
+     * own publications (Relationships.md §3). This is a first-degree edge and is
+     * NOT part of the Event-mediated traversal above; it is read exclusively by
+     * directDocuments(), which is Organization-only.
+     *
+     * Site-wide only 13, 515 and 501 currently carry Organization values; the
+     * remaining role properties are person-only in the present data but are
+     * listed so the set stays correct if that changes. They cost nothing —
+     * subjectsAny() ORs the whole set into one search.
+     *
+     * Deliberately EXCLUDES 522 `ארגונים מוזכרים` and 523 `א/נשים מוזכרים`:
+     * being mentioned in a document is not authorship of it, and folding those
+     * in would list every venue named in a catalogue among that venue's own
+     * publications.
+     */
+    const DIRECT_DOC_PROPS = [self::PROP_RELATION, self::PROP_PUBLISHER, 519, 505, 512, 503, 501];
+
     /** Literal dcterms:type value that marks a Document as an embedded video. */
     const VIDEO_TYPE = 'וידאו';
 
@@ -63,7 +86,10 @@ class ItemRelations extends AbstractHelper
     /** @var int|null */
     protected $siteId;
 
-    /** @var array Memoized subject queries, keyed by "targetId-templateId-propertyId". */
+    /**
+     * @var array Memoized subject queries. Keys are "targetId-templateId-propertyId"
+     * for subjects() and "targetId-templateId-any:id,id,…" for subjectsAny().
+     */
     protected $subjectCache = [];
 
     public function __invoke()
@@ -182,6 +208,76 @@ class ItemRelations extends AbstractHelper
             }
         }
 
+        return $groups;
+    }
+
+    /**
+     * An Organization's OWN publications: Documents that credit this Org
+     * directly through one of DIRECT_DOC_PROPS, deduplicated and date-sorted.
+     *
+     * First degree — no Event is involved. Returns [] for any other template:
+     * a Person page's "פרסומים" section is the Event-mediated list produced by
+     * relatedByTemplate() and must not change (Relationships.md §4).
+     *
+     * @return AbstractResourceEntityRepresentation[]
+     */
+    public function directDocuments(AbstractResourceEntityRepresentation $item)
+    {
+        if ($this->templateId($item) !== self::TPL_ORGANIZATION) {
+            return [];
+        }
+        $documents = array_values($this->subjectsAny(
+            $item->id(),
+            self::TPL_DOCUMENT,
+            self::DIRECT_DOC_PROPS
+        ));
+        $this->sortByDate($documents);
+        return $documents;
+    }
+
+    /**
+     * An Organization's second-degree Documents — those referencing its Events —
+     * grouped by the relationship under which the Org took part in the Event, so
+     * the headings match the "אירועים" section above them verbatim. The
+     * dcterms:relation (13) affiliation group leads and stays unlabeled, exactly
+     * as in eventsByRole().
+     *
+     * Two levels of de-duplication:
+     *  - across groups: first group wins, so a Document is never listed twice
+     *    (mirrors eventsByRole()'s rule for Events);
+     *  - against $excludeIds: pass directDocuments()'s ids so a Document
+     *    carrying dcterms:relation to BOTH the Org and one of its Events is
+     *    listed under "פרסומים" only.
+     *
+     * Adds no queries over the flat relatedByTemplate() call it replaces —
+     * subjects() memoizes per (event, template, property) and these are the same
+     * Events, visited per group instead of as one list.
+     *
+     * Organization-only; returns [] for any other template.
+     *
+     * @param int[] $excludeIds Document ids already rendered elsewhere.
+     * @return array[] Each: ['label' => string, 'documents' => resource[]]
+     */
+    public function docsFromEventsByRole(AbstractResourceEntityRepresentation $item, array $excludeIds = [])
+    {
+        if ($this->templateId($item) !== self::TPL_ORGANIZATION) {
+            return [];
+        }
+        $seen = array_fill_keys($excludeIds, true);
+        $groups = [];
+        foreach ($this->eventsByRole($item) as $group) {
+            $documents = [];
+            foreach ($this->relatedByTemplate($group['events'], self::TPL_DOCUMENT) as $document) {
+                if (isset($seen[$document->id()])) {
+                    continue;
+                }
+                $seen[$document->id()] = true;
+                $documents[] = $document;
+            }
+            if ($documents) {
+                $groups[] = ['label' => $group['label'], 'documents' => $documents];
+            }
+        }
         return $groups;
     }
 
@@ -482,6 +578,44 @@ class ItemRelations extends AbstractHelper
                 'type' => 'res',
                 'text' => $targetId,
             ]],
+            'resource_template_id' => $templateId,
+        ];
+        if ($this->siteId) {
+            $query['site_id'] = $this->siteId;
+        }
+        $resources = $this->api->search('items', $query)->getContent();
+        $this->subjectCache[$key] = $resources;
+        return $resources;
+    }
+
+    /**
+     * As subjects(), but matching ANY of several properties in a single search
+     * (Omeka joins consecutive property rows with OR when they carry
+     * joiner => 'or'). One query instead of one per property. Memoized.
+     *
+     * @param int[] $propertyIds
+     * @return AbstractResourceEntityRepresentation[]
+     */
+    protected function subjectsAny($targetId, $templateId, array $propertyIds)
+    {
+        $key = $targetId . '-' . $templateId . '-any:' . implode(',', $propertyIds);
+        if (isset($this->subjectCache[$key])) {
+            return $this->subjectCache[$key];
+        }
+        $property = [];
+        foreach (array_values($propertyIds) as $i => $propertyId) {
+            $row = [
+                'property' => $propertyId,
+                'type' => 'res',
+                'text' => $targetId,
+            ];
+            if ($i > 0) {
+                $row['joiner'] = 'or';
+            }
+            $property[] = $row;
+        }
+        $query = [
+            'property' => $property,
             'resource_template_id' => $templateId,
         ];
         if ($this->siteId) {

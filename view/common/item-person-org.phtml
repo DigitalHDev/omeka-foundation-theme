@@ -12,7 +12,8 @@ $this->htmlElement('body')->appendAttribute('class', 'item');
 $relations = $this->ItemRelations();
 
 // Perf probe: ?irdebug=N&probe=TOKEN (see helper/PerfProbe.php). Stages:
-//   1 = eventsByRole, 2 = events, 3 = documents, 4 = galleryTiles (4 = full run).
+//   1 = eventsByRole, 2 = events, 3 = documents, 4 = docGroups,
+//   5 = galleryTiles (5 = full run).
 $probe = $this->PerfProbe()->begin('irdebug');
 
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
@@ -39,15 +40,33 @@ foreach ($detailGroups as $group) {
 }
 
 // Related items: first-degree Events (grouped by the relationship/role under
-// which the person took part), second-degree Documents (publications).
+// which the person took part), then the publications.
+//
+// "פרסומים" means something different per template, deliberately (CLAUDE.md,
+// Relationships.md §4):
+//   Person (17)       — the second-degree Documents reached through their
+//                       Events. Unchanged behavior; there is no direct edge.
+//   Organization (18) — the Org's OWN Documents (first degree), with the
+//                       Event-mediated ones split out below into
+//                       "פרסומים מארועים", grouped by the Org's role in each
+//                       Event. Persons never get that second section.
 $eventGroups = $relations->eventsByRole($item);
 $probe->stage(1, 'eventsByRole', count($eventGroups));
 $events = $relations->events($item); // flat list for documents + section visibility
 $probe->stage(2, 'events', count($events));
-$documents = $relations->relatedByTemplate($events, OmekaTheme\Helper\ItemRelations::TPL_DOCUMENT);
+$isOrganization = $templateId === OmekaTheme\Helper\ItemRelations::TPL_ORGANIZATION;
+$documents = $isOrganization
+    ? $relations->directDocuments($item)
+    : $relations->relatedByTemplate($events, OmekaTheme\Helper\ItemRelations::TPL_DOCUMENT);
 $probe->stage(3, 'documents', count($documents));
+$docGroups = $isOrganization
+    ? $relations->docsFromEventsByRole($item, array_map(function ($document) {
+        return $document->id();
+    }, $documents))
+    : [];
+$probe->stage(4, 'docGroups', count($docGroups));
 $galleryTiles = $relations->galleryTiles($item);
-$probe->stage(4, 'galleryTiles', count($galleryTiles));
+$probe->stage(5, 'galleryTiles', count($galleryTiles));
 
 // Hero anchor links = the distinct relationship names (translated) the person fills.
 $anchorLabels = [];
@@ -124,7 +143,7 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
     </div>
 </section>
 
-<?php if ($events || $documents || $galleryTiles): ?>
+<?php if ($events || $documents || $docGroups || $galleryTiles): ?>
 <section class="section-container" id="related-items">
     <div class="view-controls">
         <h3 class="related-title">פריטים קשורים</h3>
@@ -166,8 +185,25 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
         </div>
         <?php endif; ?>
 
-        <?php if ($galleryTiles): ?>
+        <?php if ($docGroups): ?>
         <?php if ($events || $documents): ?><hr class="group-divider"><?php endif; ?>
+        <div class="result-section">
+            <div class="result-group-header">פרסומים מארועים</div>
+            <?php foreach ($docGroups as $group): ?>
+            <div class="result-subgroup">
+                <?php if ($group['label'] !== ''): ?>
+                <h4 class="result-subgroup-header"><?php echo $escape($group['label']); ?></h4>
+                <?php endif; ?>
+                <div class="group-content">
+                    <?php foreach ($group['documents'] as $document) { $renderCard($document); } ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($galleryTiles): ?>
+        <?php if ($events || $documents || $docGroups): ?><hr class="group-divider"><?php endif; ?>
         <div class="result-section installation-gallery-section">
             <div class="result-group-header">צילומי הצבה</div>
             <div class="group-content gallery-content">

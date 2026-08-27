@@ -94,7 +94,7 @@ them, so there is no ambiguity, but the stage numbers mean different things per 
 
 | Partial | Templates | Stages |
 |---|---|---|
-| `item-person-org.phtml` | 17, 18 | 1 = eventsByRole, 2 = events, 3 = documents, 4 = galleryTiles |
+| `item-person-org.phtml` | 17, 18 | 1 = eventsByRole, 2 = events, 3 = documents, 4 = docGroups, 5 = galleryTiles |
 | `item-event.phtml` | 16 | 1 = parentResource, 2 = creatorGroups, 3 = relatedDocsAndPhotos |
 | `item-document.phtml` | 15, 20 | 1 = parentResource, 2 = creatorGroups, 3 = mediaTiles |
 
@@ -207,6 +207,20 @@ What fills the grid differs by type — Person/Org get their related Events, Doc
 installation photos; a Document gets **its own media files** as lightbox tiles; an Event
 gets the Documents and Photographs that reference it.
 
+**Publications are split differently for a Person and for an Organization**, on purpose.
+A Person has no direct Document edge, so their single **פרסומים** section is the
+second-degree list reached through their Events — unchanged since the redesign. An
+Organization *does* own Documents directly, so its page renders two sibling sections:
+
+| Section | Organization (18) | Person (17) |
+|---|---|---|
+| **פרסומים** | `directDocuments()` — the Org's own Documents, first degree | `relatedByTemplate($events, 15)` — through their Events |
+| **פרסומים מארועים** | `docsFromEventsByRole()` — through its Events, grouped and headed by the Org's role in each Event (affiliation group leads, unlabeled) | *not rendered* |
+
+Do not add **פרסומים מארועים** to Person pages, and do not change what **פרסומים** means
+for a Person. The second section reuses the existing `.result-subgroup` /
+`.result-subgroup-header` markup from the אירועים section — no new CSS or JS.
+
 The item-child pages set the body class to `item-child` **only**. Adding `item` would pull
 in `.item .item-hero-grid` and `.item .hero-title` from `site.css`, which restyle the
 full-size hero and must not apply to the condensed layout.
@@ -223,8 +237,10 @@ the pages use the inline `commentForm` card instead.
 `helper/ItemRelations.php` supplies the data. Beyond the Person/Org methods it exposes:
 `parentResource()` (the parent-bar target), `creatorGroups()` (**Agents** grouped by
 creator-role property), `mediaTiles()` (one resource's own files as gallery tiles),
-`relatedDocsAndPhotos()`, and `primaryFileLink()` (the hero "open file" target, or the
-YouTube link for a video Document).
+`relatedDocsAndPhotos()`, `directDocuments()` / `docsFromEventsByRole()` (the two
+Organization publication sections above — both return `[]` for any other template), and
+`primaryFileLink()` (the hero "open file" target, or the YouTube link for a video
+Document).
 
 **The creators cloud carries Organizations as well as People.** The role properties in
 `ItemRelations::ROLE_PROPS` take an *Agent* — template 17 or 18 — so `creatorGroups()`

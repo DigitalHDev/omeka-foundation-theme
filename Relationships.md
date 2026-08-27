@@ -27,6 +27,7 @@ search UI they are also *displayed* as one "מסמכים" checkbox.
 | `dcterms:relation` | 13 | Doc/Photo → Event, Doc/Photo → Org, Event → Org (affiliation/host) |
 | `ceramic:creator` | 501 | Event → Agent (the primary creator role) |
 | sibling creator roles | 502, 512, 518, 511, 514, 503, 500, 506, 504 | Event → Agent under other roles (curator, photographer, supporter, …) |
+| `ceramic:publisher` | 515 | Document → Agent (`מו"ל`); with 13 the main direct Document → Org credit |
 | `dcterms:title` | 1 | Search (`in` = contains) |
 | `dcterms:date` | — | Sorting and decade facets |
 | `dcterms:type` | — | Event type facet; also marks a Document as video (`וידאו`) |
@@ -63,7 +64,7 @@ graph TD
     E -->|dcterms:relation 13 - affiliation| O["Organization (18)"]
     E -->|role props - credit| O
     E -->|ceramic:creator 501 + sibling roles| PE["Person (17)"]
-    D -.->|dcterms:relation 13 - direct, secondary| O
+    D -.->|13 + ceramic:publisher 515 - direct credit| O
 ```
 
 - **Document/Photograph → Event** — the Doc/Photo holds the value.
@@ -76,9 +77,20 @@ graph TD
   properties. A Person page finds their Events by reverse lookup.
 - **Event → Agent** — Person and Organization are interchangeable as the value of any role
   property (§2); code that walks a role edge must not assume template 17.
-- **Document → Organization (direct, dashed)** — exists in the data, but is **not** part
-  of the canonical Organization second-degree config and is deliberately not used for the
-  home page's "פריטים נבחרים" section.
+- **Document → Organization (direct)** — a Document credits an Organization without any
+  Event in between; the *Document* holds the value. The property set is
+  `ItemRelations::DIRECT_DOC_PROPS` = `[13, 515, 519, 505, 512, 503, 501]`, of which only
+  13, 515 and 501 carry Organization values in the present data (the rest are person-only,
+  and are listed so the set stays correct if that changes). It **excludes** 522
+  `ארגונים מוזכרים` and 523 `א/נשים מוזכרים` — being mentioned in a document is not
+  authorship of it, and including them would list every venue named in a catalogue among
+  that venue's own publications.
+
+  Read **only** by `ItemRelations::directDocuments()`, which fills the "פרסומים" section of
+  an Organization item page (§4). Deliberately **not** used by the home page's
+  "פריטים נבחרים" section, and not part of the canonical Organization second-degree config
+  in `linked-resources.phtml`. There is no equivalent edge for a Person: a Person page's
+  "פרסומים" stays the Event-mediated list.
 
 People and Documents/Photographs are **siblings** under an Event. A Person is never an
 intermediate node between an Organization and a Document.
@@ -90,6 +102,8 @@ intermediate node between an Organization and a Document.
 | Person | Events | reverse via role props | `ItemRelations::events()` / `eventsByRole()` |
 | Org | Events | reverse via 13 **and** role props | `ItemRelations::events()` / `eventsByRole()` |
 | Person/Org | Docs + Photos | Events, then reverse via 13 | `ItemRelations::relatedByTemplate()`, `galleryTiles()` |
+| **Org** | its own Docs | reverse via `DIRECT_DOC_PROPS` (first degree, no Event) | `ItemRelations::directDocuments()` |
+| **Org** | Docs by role | `eventsByRole()`, then reverse via 13 per group | `ItemRelations::docsFromEventsByRole()` |
 | Org | People | Events, then forward via role props | `linked-resources.phtml` config 18 → "People in Events" |
 | Doc/Photo | Event / Org / Person | forward via 13, then Event's values | `HomeGraph::walkToType()` |
 | Org item set | Docs + Photos (grandchildren) | Orgs → reverse 13 → Events → reverse 13 → Docs/Photos | `HomeGraph::orgDescendantPool()` |
