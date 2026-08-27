@@ -18,7 +18,7 @@ search). Traversal rules are governed by the **SecondDegreeResources usage polic
 | Photographs   | 20          | *(photograph template)*| Behaves like a Document in every traversal |
 
 Documents (15) and Photographs (20) are always traversed as a pair. In the faceted
-search UI they are also *displayed* as one "מסמכים" checkbox.
+search UI they are also *displayed* as one "מדיה" checkbox.
 
 ## 2. Properties used as edges
 
@@ -86,11 +86,11 @@ graph TD
   authorship of it, and including them would list every venue named in a catalogue among
   that venue's own publications.
 
-  Read **only** by `ItemRelations::directDocuments()`, which fills the "פרסומים" section of
+  Read **only** by `ItemRelations::directDocuments()`, which fills the "מדיה" section of
   an Organization item page (§4). Deliberately **not** used by the home page's
   "פריטים נבחרים" section, and not part of the canonical Organization second-degree config
   in `linked-resources.phtml`. There is no equivalent edge for a Person: a Person page's
-  "פרסומים" stays the Event-mediated list.
+  "מדיה" stays the Event-mediated list.
 
 People and Documents/Photographs are **siblings** under an Event. A Person is never an
 intermediate node between an Organization and a Document.

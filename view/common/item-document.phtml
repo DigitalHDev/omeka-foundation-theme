@@ -23,7 +23,7 @@ $probe = $this->PerfProbe()->begin('irdebug');
 
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
 $isPhotograph = $templateId === OmekaTheme\Helper\ItemRelations::TPL_PHOTOGRAPH;
-$typeLabel = $isPhotograph ? 'צילומים' : 'מסמכים';
+$typeLabel = $isPhotograph ? 'צילומים' : 'מדיה';
 
 $heroImage = $item->thumbnailDisplayUrl('large');
 $fileLink = $relations->primaryFileLink($item);

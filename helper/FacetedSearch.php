@@ -56,7 +56,7 @@ class FacetedSearch extends AbstractHelper
     const TYPES = [
         self::TPL_PERSON => 'אנשים',
         self::TPL_EVENT => 'אירועים',
-        self::TPL_DOCUMENT => 'מסמכים',
+        self::TPL_DOCUMENT => 'מדיה',
         self::TPL_ORGANIZATION => 'ארגונים',
     ];
 

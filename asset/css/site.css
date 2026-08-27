@@ -861,7 +861,7 @@ body:not(.item) #results-container.is-grid {
    .result-group-header sits at top:0 behind it (z-index 700 vs 9999), so it
    adds no extra obstruction. */
 .result-subgroup-header[id] {
-  scroll-margin-top: 100px;
+  scroll-margin-top: 80px;
 }
 .result-subgroup-header {
   width: 100%;

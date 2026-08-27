@@ -216,7 +216,7 @@ class ItemRelations extends AbstractHelper
      * directly through one of DIRECT_DOC_PROPS, deduplicated and date-sorted.
      *
      * First degree — no Event is involved. Returns [] for any other template:
-     * a Person page's "פרסומים" section is the Event-mediated list produced by
+     * a Person page's "מדיה" section is the Event-mediated list produced by
      * relatedByTemplate() and must not change (Relationships.md §4).
      *
      * @return AbstractResourceEntityRepresentation[]
@@ -247,7 +247,7 @@ class ItemRelations extends AbstractHelper
      *    (mirrors eventsByRole()'s rule for Events);
      *  - against $excludeIds: pass directDocuments()'s ids so a Document
      *    carrying dcterms:relation to BOTH the Org and one of its Events is
-     *    listed under "פרסומים" only.
+     *    listed under "מדיה" only.
      *
      * Adds no queries over the flat relatedByTemplate() call it replaces —
      * subjects() memoizes per (event, template, property) and these are the same
@@ -282,7 +282,7 @@ class ItemRelations extends AbstractHelper
     }
 
     /**
-     * Build the "צילומי הצבה" gallery tiles from the Documents and Photographs
+     * Build the "דפדוף" gallery tiles from the Documents and Photographs
      * connected to this Person/Org (second degree, via their Events).
      *
      *  - A Document/Photograph whose dcterms:type is "וידאו" yields one video

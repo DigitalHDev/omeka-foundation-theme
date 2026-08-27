@@ -42,13 +42,13 @@ foreach ($detailGroups as $group) {
 // Related items: first-degree Events (grouped by the relationship/role under
 // which the person took part), then the publications.
 //
-// "פרסומים" means something different per template, deliberately (CLAUDE.md,
+// "מדיה" means something different per template, deliberately (CLAUDE.md,
 // Relationships.md §4):
 //   Person (17)       — the second-degree Documents reached through their
 //                       Events. Unchanged behavior; there is no direct edge.
 //   Organization (18) — the Org's OWN Documents (first degree), with the
 //                       Event-mediated ones split out below into
-//                       "פרסומים מארועים", grouped by the Org's role in each
+//                       "מדיה מארועים", grouped by the Org's role in each
 //                       Event. Persons never get that second section.
 $eventGroups = $relations->eventsByRole($item);
 $probe->stage(1, 'eventsByRole', count($eventGroups));
@@ -198,7 +198,7 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
         <?php if ($documents): ?>
         <?php if ($events): ?><hr class="group-divider"><?php endif; ?>
         <div class="result-section">
-            <div class="result-group-header">פרסומים</div>
+            <div class="result-group-header">מדיה</div>
             <div class="group-content">
                 <?php foreach ($documents as $document) { $renderCard($document); } ?>
             </div>
@@ -208,7 +208,7 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
         <?php if ($docGroups): ?>
         <?php if ($events || $documents): ?><hr class="group-divider"><?php endif; ?>
         <div class="result-section">
-            <div class="result-group-header">פרסומים מארועים</div>
+            <div class="result-group-header">מדיה מארועים</div>
             <?php foreach ($docGroups as $group): ?>
             <div class="result-subgroup">
                 <?php if ($group['label'] !== ''): ?>
@@ -225,7 +225,7 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
         <?php if ($galleryTiles): ?>
         <?php if ($events || $documents || $docGroups): ?><hr class="group-divider"><?php endif; ?>
         <div class="result-section installation-gallery-section">
-            <div class="result-group-header">צילומי הצבה</div>
+            <div class="result-group-header">דפדוף</div>
             <div class="group-content gallery-content">
                 <?php foreach ($galleryTiles as $tile): ?>
                 <?php if (!$tile['thumb']) { continue; } ?>

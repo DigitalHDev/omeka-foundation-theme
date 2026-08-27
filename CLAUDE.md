@@ -208,16 +208,16 @@ installation photos; a Document gets **its own media files** as lightbox tiles; 
 gets the Documents and Photographs that reference it.
 
 **Publications are split differently for a Person and for an Organization**, on purpose.
-A Person has no direct Document edge, so their single **פרסומים** section is the
+A Person has no direct Document edge, so their single **מדיה** section is the
 second-degree list reached through their Events — unchanged since the redesign. An
 Organization *does* own Documents directly, so its page renders two sibling sections:
 
 | Section | Organization (18) | Person (17) |
 |---|---|---|
-| **פרסומים** | `directDocuments()` — the Org's own Documents, first degree | `relatedByTemplate($events, 15)` — through their Events |
-| **פרסומים מארועים** | `docsFromEventsByRole()` — through its Events, grouped and headed by the Org's role in each Event (affiliation group leads, unlabeled) | *not rendered* |
+| **מדיה** | `directDocuments()` — the Org's own Documents, first degree | `relatedByTemplate($events, 15)` — through their Events |
+| **מדיה מארועים** | `docsFromEventsByRole()` — through its Events, grouped and headed by the Org's role in each Event (affiliation group leads, unlabeled) | *not rendered* |
 
-Do not add **פרסומים מארועים** to Person pages, and do not change what **פרסומים** means
+Do not add **מדיה מארועים** to Person pages, and do not change what **מדיה** means
 for a Person. The second section reuses the existing `.result-subgroup` /
 `.result-subgroup-header` markup from the אירועים section — no new CSS or JS.
 
