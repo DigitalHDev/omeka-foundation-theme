@@ -21,7 +21,7 @@ $relations = $this->ItemRelations();
 //   1 = parentResource, 2 = creatorGroups, 3 = relatedDocsAndPhotos (3 = full run).
 $probe = $this->PerfProbe()->begin('irdebug');
 
-$heroImage = $relations->eventThumbnail($item);
+$heroImage = $relations->eventThumbnail($item, 'large');
 $description = $item->value('dcterms:description');
 $date = $item->value('dcterms:date');
 

@@ -491,14 +491,17 @@ class ItemRelations extends AbstractHelper
      * connected to the Event (Event <- Document via dcterms:relation). One image
      * is chosen at random across all qualifying media so the card image varies
      * between requests. Returns '' when no related Document carries an image.
+     *
+     * $size is an Omeka thumbnail type ('square', 'medium', 'large'); the Event
+     * hero asks for 'large', cards keep 'medium'.
      */
-    public function eventThumbnail(AbstractResourceEntityRepresentation $event)
+    public function eventThumbnail(AbstractResourceEntityRepresentation $event, $size = 'medium')
     {
         $thumbs = [];
         foreach ($this->relatedByTemplate([$event], self::TPL_DOCUMENT) as $document) {
             foreach ($document->media() as $media) {
                 if ($media->hasThumbnails()) {
-                    $thumbs[] = $media->thumbnailUrl('medium');
+                    $thumbs[] = $media->thumbnailUrl($size);
                 }
             }
         }
