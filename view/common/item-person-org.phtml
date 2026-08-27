@@ -180,9 +180,12 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
         <div class="result-section">
             <div class="result-group-header">אירועים</div>
             <?php foreach ($eventGroups as $index => $group): ?>
-            <div class="result-subgroup"<?php if (isset($groupAnchorIds[$index])): ?> id="<?php echo $escape($groupAnchorIds[$index]); ?>"<?php endif; ?>>
+            <div class="result-subgroup">
                 <?php if ($group['label'] !== ''): ?>
-                <h4 class="result-subgroup-header"><?php echo $escape($group['label']); ?></h4>
+                <?php /* The anchor sits on the label itself so the jump lands with the
+                         group name visible; .result-subgroup-header[id] carries the
+                         scroll-margin that clears the sticky bars. */ ?>
+                <h4 class="result-subgroup-header"<?php if (isset($groupAnchorIds[$index])): ?> id="<?php echo $escape($groupAnchorIds[$index]); ?>"<?php endif; ?>><?php echo $escape($group['label']); ?></h4>
                 <?php endif; ?>
                 <div class="group-content">
                     <?php foreach ($group['events'] as $event) { $renderCard($event, false); } ?>

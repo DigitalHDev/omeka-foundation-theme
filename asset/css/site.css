@@ -857,6 +857,11 @@ body:not(.item) #results-container.is-grid {
 .result-subgroup:last-child {
   margin-bottom: 0;
 }
+/* Hero-anchor jump targets: clear the sticky utility bar (~90px) plus the
+   sticky .result-group-header so the label itself stays visible. */
+.result-subgroup-header[id] {
+  scroll-margin-top: 150px;
+}
 .result-subgroup-header {
   width: 100%;
   font-family: var(--font-narkiss);
