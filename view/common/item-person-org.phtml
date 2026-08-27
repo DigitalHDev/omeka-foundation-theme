@@ -68,12 +68,29 @@ $probe->stage(4, 'docGroups', count($docGroups));
 $galleryTiles = $relations->galleryTiles($item);
 $probe->stage(5, 'galleryTiles', count($galleryTiles));
 
-// Hero anchor links = the distinct relationship names (translated) the person fills.
-$anchorLabels = [];
-foreach ($eventGroups as $group) {
-    if ($group['label'] !== '' && !in_array($group['label'], $anchorLabels, true)) {
-        $anchorLabels[] = $group['label'];
+// Hero anchor links = the distinct relationship names (translated) the person
+// fills, each jumping to that group's own subsection rather than to the top of
+// the related-items section. On an Organization the leading unlabeled
+// (affiliation) group has no name of its own, so it gets a "ראשי" link to the
+// section top — only when there are named groups to distinguish it from.
+$anchors = [];
+$groupAnchorIds = [];
+$seenLabels = [];
+$hasUnlabeledGroup = false;
+foreach ($eventGroups as $index => $group) {
+    if ($group['label'] === '') {
+        $hasUnlabeledGroup = true;
+        continue;
     }
+    if (isset($seenLabels[$group['label']])) {
+        continue;
+    }
+    $seenLabels[$group['label']] = true;
+    $groupAnchorIds[$index] = 'event-group-' . $index;
+    $anchors[] = ['label' => $group['label'], 'href' => '#event-group-' . $index];
+}
+if ($isOrganization && $hasUnlabeledGroup && $anchors) {
+    array_unshift($anchors, ['label' => 'ראשי', 'href' => '#related-items']);
 }
 
 $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
@@ -112,11 +129,11 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
         <?php if ($birthDate): ?>
         <p class="hero-dates">נ׳ <?php echo $escape((string) $birthDate); ?></p>
         <?php endif; ?>
-        <?php if ($anchorLabels): ?>
+        <?php if ($anchors): ?>
         <p class="hero-anchors">
-            <?php $first = true; foreach ($anchorLabels as $label): ?>
+            <?php $first = true; foreach ($anchors as $anchor): ?>
             <?php if (!$first): ?><span class="hero-anchor-sep">/</span><?php endif; ?>
-            <a href="#related-items" class="hero-anchor-link"><?php echo $escape($label); ?></a>
+            <a href="<?php echo $escape($anchor['href']); ?>" class="hero-anchor-link"><?php echo $escape($anchor['label']); ?></a>
             <?php $first = false; endforeach; ?>
         </p>
         <?php endif; ?>
@@ -162,8 +179,8 @@ $renderCard = function ($resource, $showType = true) use ($escape, $relations) {
         <?php if ($eventGroups): ?>
         <div class="result-section">
             <div class="result-group-header">אירועים</div>
-            <?php foreach ($eventGroups as $group): ?>
-            <div class="result-subgroup">
+            <?php foreach ($eventGroups as $index => $group): ?>
+            <div class="result-subgroup"<?php if (isset($groupAnchorIds[$index])): ?> id="<?php echo $escape($groupAnchorIds[$index]); ?>"<?php endif; ?>>
                 <?php if ($group['label'] !== ''): ?>
                 <h4 class="result-subgroup-header"><?php echo $escape($group['label']); ?></h4>
                 <?php endif; ?>
