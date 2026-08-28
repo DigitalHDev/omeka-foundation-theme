@@ -4,9 +4,9 @@
  * Rendered from view/omeka/site/item/show.phtml for those templates only; the
  * page chrome (header/footer) comes from view/layout/layout.phtml.
  *
- * The results grid holds the item's OWN media files, not second-degree
- * resources — the "parent" here is the Event the item belongs to, shown in the
- * back-link bar above the hero.
+ * There is no results grid: the page is the parent bar, the hero and the
+ * details drawer. The "parent" here is the Event the item belongs to, shown in
+ * the back-link bar above the hero.
  *
  * @var \Omeka\Api\Representation\ItemRepresentation $item
  */
@@ -18,7 +18,7 @@ $this->htmlElement('body')->appendAttribute('class', 'item-child');
 $relations = $this->ItemRelations();
 
 // Perf probe: ?irdebug=N&probe=TOKEN (see helper/PerfProbe.php). Stages:
-//   1 = parentResource, 2 = creatorGroups, 3 = mediaTiles (3 = full run).
+//   1 = parentResource, 2 = creatorGroups (2 = full run).
 $probe = $this->PerfProbe()->begin('irdebug');
 
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
@@ -45,8 +45,6 @@ $parent = $relations->parentResource($item);
 $probe->stage(1, 'parentResource', $parent ? $parent->id() : null);
 $creatorGroups = $relations->creatorGroups($item);
 $probe->stage(2, 'creatorGroups', count($creatorGroups));
-$tiles = $relations->mediaTiles($item);
-$probe->stage(3, 'mediaTiles', count($tiles));
 
 // Expandable "show more" details drawer. Each entry renders only when present.
 // bibo:uri is handled separately so it can use the .external-links treatment.
@@ -158,63 +156,6 @@ $hasDetails = $detailRows || $externalLinks;
         <?php endif; ?>
     </div>
 </section>
-
-<?php if ($tiles): ?>
-<hr class="group-divider">
-
-<section class="section-container" id="related-items">
-    <div class="view-controls">
-        <h3 class="related-title">פריטים בקטלוג</h3>
-        <div class="view-controls-actions">
-            <div class="switcher-buttons">
-                <button id="grid-view-btn" class="active" aria-label="תצוגת רשת"><i class="ph-light ph-squares-four"></i></button>
-                <button id="list-view-btn" aria-label="תצוגת רשימה"><i class="ph-light ph-list"></i></button>
-            </div>
-        </div>
-    </div>
-
-    <div id="results-container" class="is-grid">
-        <?php /* installation-gallery-section carries the list-mode gallery CSS in site.css. */ ?>
-        <div class="result-section installation-gallery-section">
-            <div class="group-content gallery-content">
-                <?php foreach ($tiles as $tile): ?>
-                <?php if (!$tile['thumb']) { continue; } ?>
-                <div class="gallery-item<?php echo $tile['kind'] === 'video' ? ' gallery-item-video' : ''; ?>">
-                    <button type="button" class="gallery-thumb-btn"
-                        data-lightbox-kind="<?php echo $escape($tile['kind']); ?>"
-                        data-lightbox-src="<?php echo $escape($tile['kind'] === 'video' ? $tile['embed'] : $tile['full']); ?>"
-                        <?php if ($tile['kind'] === 'image'): ?>data-lightbox-download="<?php echo $escape($tile['full']); ?>"<?php endif; ?>
-                        data-lightbox-caption="<?php echo $escape($tile['caption']); ?>">
-                        <img src="<?php echo $escape($tile['thumb']); ?>" alt="<?php echo $escape($tile['caption']); ?>">
-                        <span class="gallery-thumb-label"><?php echo $escape($tile['caption']); ?></span>
-                    </button>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-</section>
-
-<div id="image-lightbox" class="lightbox-overlay" aria-hidden="true">
-    <button type="button" class="lightbox-close" aria-label="סגירה">
-        <i class="ph-light ph-x"></i>
-    </button>
-    <button type="button" class="lightbox-download" aria-label="הורדת תמונה">
-        <i class="ph-light ph-download-simple"></i>
-    </button>
-    <button type="button" class="lightbox-nav lightbox-prev" aria-label="תמונה קודמת">
-        <i class="ph-light ph-caret-right"></i>
-    </button>
-    <figure class="lightbox-frame">
-        <img id="lightbox-image" src="" alt="">
-        <div id="lightbox-video" class="lightbox-video" hidden></div>
-        <figcaption id="lightbox-caption"></figcaption>
-    </figure>
-    <button type="button" class="lightbox-nav lightbox-next" aria-label="תמונה הבאה">
-        <i class="ph-light ph-caret-left"></i>
-    </button>
-</div>
-<?php endif; ?>
 
 <?php if ($this->getHelperPluginManager()->has('commentForm')): ?>
 <section class="section-container item-feedback-section">

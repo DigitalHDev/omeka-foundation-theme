@@ -96,7 +96,7 @@ them, so there is no ambiguity, but the stage numbers mean different things per 
 |---|---|---|
 | `item-person-org.phtml` | 17, 18 | 1 = eventsByRole, 2 = events, 3 = documents, 4 = docGroups, 5 = galleryTiles |
 | `item-event.phtml` | 16 | 1 = parentResource, 2 = creatorGroups, 3 = relatedDocsAndPhotos |
-| `item-document.phtml` | 15, 20 | 1 = parentResource, 2 = creatorGroups, 3 = mediaTiles |
+| `item-document.phtml` | 15, 20 | 1 = parentResource, 2 = creatorGroups |
 
 Stage 2 is the useful one in each: on a Person/Org it brackets the reverse role-property
 traversal, and on an Event/Document it brackets `creatorGroups()`, whose cost is the
@@ -202,10 +202,10 @@ configured in `config/theme.ini`.
 | Events (16) | `view/common/item-event.phtml` | `Designs/item-child.html` |
 
 All three share the same chrome: a back-link parent bar, a hero, an expandable details
-drawer, a results grid with a grid/list switcher, and the `commentForm` feedback card.
-What fills the grid differs by type — Person/Org get their related Events, Documents and
-installation photos; a Document gets **its own media files** as lightbox tiles; an Event
-gets the Documents and Photographs that reference it.
+drawer and the `commentForm` feedback card. Person/Org and Event pages add a results
+grid with a grid/list switcher: Person/Org get their related Events, Documents and
+installation photos, an Event gets the Documents and Photographs that reference it.
+**A Document/Photograph page has no results grid** — it ends after the details drawer.
 
 **Publications are split differently for a Person and for an Organization**, on purpose.
 A Person has no direct Document edge, so their single **מדיה** section is the
@@ -236,7 +236,8 @@ the pages use the inline `commentForm` card instead.
 
 `helper/ItemRelations.php` supplies the data. Beyond the Person/Org methods it exposes:
 `parentResource()` (the parent-bar target), `creatorGroups()` (**Agents** grouped by
-creator-role property), `mediaTiles()` (one resource's own files as gallery tiles),
+creator-role property), `mediaTiles()` (one resource's own files as gallery tiles —
+currently unused by any template),
 `relatedDocsAndPhotos()`, `directDocuments()` / `docsFromEventsByRole()` (the two
 Organization publication sections above — both return `[]` for any other template), and
 `primaryFileLink()` (the hero "open file" target, or the YouTube link for a video
