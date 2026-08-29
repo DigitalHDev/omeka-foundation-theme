@@ -499,6 +499,48 @@ warming request.
 > table (because `files/` is not writable by `apache`) and key it on a last-modified stamp
 > rather than a TTL.
 
+## Post-plan measurements
+
+Costs added by later feature work, measured the same way so they can be compared against the
+numbers above. **This plan stays finished** — these are recorded so a future regression has a
+baseline to be judged against, not as new phases.
+
+### Constructed titles on all non-hero thumbnails (2026-08-29)
+
+Result cards on search-results / Person-Org / Event pages started labelling thumbnails with
+the `ComposeResourceTitle` construction. Each Document card resolves its related Event and
+that Event's creators, org and date — the classic N+1 shape this document warns about — so it
+was measured before and after.
+
+Full-page wall time over loopback, three runs each, no debug param:
+
+| Page | Before | After | Delta |
+|---|---|---|---|
+| Search, `?types[]=15` (24 cards) | 0.327s / 0.326s / 0.363s | 0.408s / 0.408s / 0.424s | **+0.082s** (~3.4ms per card) |
+| Person 1634 | 0.581s / 0.608s / 0.657s | 0.681s / 0.688s / (1.657s) | **+0.070s** |
+
+The 1.657s reading was the first request after `git pull`, i.e. OPcache recompiling the
+changed files. It is not part of the comparison — it is the same cold-compile artefact the
+Phase 0 warning above describes, and it disappears by the second run. **Always discard the
+first run after a deploy.**
+
+**No pre-resolve pass was built.** `ComposeResourceTitle`'s per-request memo cache keys on
+`resourceName:id`, so the Event shared by several Documents on a page is composed once; the
+measured per-card cost stayed low enough that batching the lookups in `FacetedSearch` would
+be optimising against 80ms. If a future page pushes search past ~0.5s, that batching is the
+first thing to build.
+
+**Note the wrong probe trap.** `?fsdebug=3` and `?irdebug=2` are useless for this kind of
+change: both dump and `exit` *before* the template renders any cards, so neither covers card
+rendering at all. No probe stage does. Rendering cost has to be measured as full-page wall
+time with no debug param.
+
+### Open, unrelated: `eventsByRole()` N+1
+
+Seen in passing while measuring the above, on Person 1634: `eventsByRole()` costs **326
+queries and 0.25s** to produce 3 role groups (`?irdebug=1`). Pre-existing, not caused by the
+title change, and the largest single cost left on a Person page. Not investigated.
+
 ## Explicitly out of scope
 
 - Rewriting the derived-facet search branches as raw DQL/SQL. Forks the traversal
