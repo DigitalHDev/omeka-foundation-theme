@@ -5,7 +5,6 @@
  * @var \OmekaTheme\Helper\FacetedSearch $search  Already invoked.
  */
 $escape = $this->plugin('escapeHtml');
-$relations = $this->ItemRelations();
 $placeholderThumb = $this->assetUrl('img/place-holder_51.png');
 
 $browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
@@ -112,23 +111,11 @@ $resultsTitle = $term !== ''
         <?php if (!$results): ?>
         <p class="no-results">לא נמצאו תוצאות.</p>
         <?php endif; ?>
-        <?php foreach ($results as $item): $card = $relations->cardData($item); ?>
-        <div class="archive-item">
-            <a href="<?php echo $escape($card['url']); ?>" class="item-link">
-                <div class="item-visual<?php echo $card['thumb'] ? '' : ' is-placeholder'; ?>">
-                    <img src="<?php echo $escape($card['thumb'] ?: $placeholderThumb); ?>" alt="">
-                </div>
-                <div class="item-metadata">
-                    <div class="meta-col title-col">
-                        <?php if ($card['type'] !== ''): ?><p class="item-type-grid"><?php echo $escape($card['type']); ?></p><?php endif; ?>
-                        <h4 class="item-name"><?php echo $escape($card['name']); ?></h4>
-                    </div>
-                    <div class="meta-col artist-col"><?php echo $escape($card['artist']); ?></div>
-                    <div class="meta-col date-col"><?php echo $escape($card['date']); ?></div>
-                    <div class="meta-col medium-col"><?php echo $escape($card['medium']); ?></div>
-                </div>
-            </a>
-        </div>
+        <?php foreach ($results as $item): ?>
+        <?php echo $this->partial('common/archive-item-card', [
+            'resource' => $item,
+            'placeholderThumb' => $placeholderThumb,
+        ]); ?>
         <?php endforeach; ?>
     </div>
 

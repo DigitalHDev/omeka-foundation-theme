@@ -461,9 +461,17 @@ class ItemRelations extends AbstractHelper
      * Document connected to the Event (see eventThumbnail()). The pick is random,
      * so the image varies between requests.
      *
-     * @return array ['url','thumb','type','name','artist','date','medium']
+     * 'composed' is the ComposeResourceTitle title the card grid displays - the
+     * same helper that already captions the gallery/lightbox tiles in
+     * tilesForSource(). When the card is going to print the type chip above the
+     * title ('showType'), the type is taken out of the composed title so it is
+     * not said twice; ComposeResourceTitle::withoutType() owns that rule.
+     * 'name' stays the plain display title, for the list view's own columns.
+     *
+     * @param bool $showType Whether the caller renders the .item-type-grid chip.
+     * @return array ['url','thumb','type','showType','name','composed','artist','date','medium']
      */
-    public function cardData(AbstractResourceEntityRepresentation $resource)
+    public function cardData(AbstractResourceEntityRepresentation $resource, $showType = true)
     {
         $template = $resource->resourceTemplate();
         $type = $this->literal($resource, 'dcterms:type');
@@ -475,11 +483,15 @@ class ItemRelations extends AbstractHelper
         if (!$thumb && $this->templateId($resource) === self::TPL_EVENT) {
             $thumb = $this->eventThumbnail($resource);
         }
+        $showType = $showType && $type !== '';
+        $compose = $this->getView()->plugin('ComposeResourceTitle');
         return [
             'url' => $resource->url(),
             'thumb' => $thumb,
             'type' => $type,
+            'showType' => $showType,
             'name' => $resource->displayTitle(),
+            'composed' => $showType ? $compose->withoutType($resource) : $compose($resource),
             'artist' => $this->creatorNames($resource),
             'date' => $this->literal($resource, 'dcterms:date'),
             'medium' => $this->literal($resource, 'dcterms:medium'),

@@ -59,26 +59,9 @@ foreach ($detailGroups as $group) {
 $externalLinks = $item->value('bibo:uri', ['all' => true]);
 $hasDetails = $detailRows || $externalLinks;
 
-$renderCard = function ($resource) use ($escape, $relations) {
-    $card = $relations->cardData($resource);
-    ?>
-    <div class="archive-item">
-        <a href="<?php echo $escape($card['url']); ?>" class="item-link">
-            <div class="item-visual">
-                <?php if ($card['thumb']): ?><img src="<?php echo $escape($card['thumb']); ?>" alt=""><?php endif; ?>
-            </div>
-            <div class="item-metadata">
-                <div class="meta-col title-col">
-                    <?php if ($card['type'] !== ''): ?><p class="item-type-grid"><?php echo $escape($card['type']); ?></p><?php endif; ?>
-                    <h4 class="item-name"><?php echo $escape($card['name']); ?></h4>
-                </div>
-                <div class="meta-col artist-col"><?php echo $escape($card['artist']); ?></div>
-                <div class="meta-col date-col"><?php echo $escape($card['date']); ?></div>
-                <div class="meta-col medium-col"><?php echo $escape($card['medium']); ?></div>
-            </div>
-        </a>
-    </div>
-    <?php
+$partial = $this->plugin('partial');
+$renderCard = function ($resource) use ($partial) {
+    echo $partial('common/archive-item-card', ['resource' => $resource]);
 };
 ?>
 

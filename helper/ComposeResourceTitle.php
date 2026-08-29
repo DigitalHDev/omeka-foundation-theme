@@ -93,6 +93,39 @@ class ComposeResourceTitle extends AbstractHelper
     }
 
     /**
+     * The composed title with its leading *type* part removed, for callers that
+     * already display the type separately - the `.item-type-grid` chip printed
+     * above the title on an archive-item card.
+     *
+     * @return string
+     */
+    public function withoutType(AbstractResourceEntityRepresentation $resource)
+    {
+        return $this->join($this->partsWithoutType($resource));
+    }
+
+    /**
+     * parts() minus the leading type part.
+     *
+     * Only documentParts() prefixes a type. An Event, a Person and an
+     * Organization all lead with their own title, so dropping the first part
+     * there would lose the name itself - which is why this rule lives in the
+     * helper and not at the call site. When a Document carries no dcterms:type
+     * the leading part is '' and shifting it off changes nothing.
+     *
+     * @return string[]
+     */
+    public function partsWithoutType(AbstractResourceEntityRepresentation $resource)
+    {
+        $parts = $this->parts($resource);
+        $template = $this->templateId($resource);
+        if ($template === self::TPL_DOCUMENT || $template === self::TPL_PHOTOGRAPH) {
+            array_shift($parts);
+        }
+        return $parts;
+    }
+
+    /**
      * @return string[]
      */
     protected function eventParts(AbstractResourceEntityRepresentation $event)

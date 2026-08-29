@@ -207,6 +207,32 @@ grid with a grid/list switcher: Person/Org get their related Events, Documents a
 installation photos, an Event gets the Documents and Photographs that reference it.
 **A Document/Photograph page has no results grid** — it ends after the details drawer.
 
+### Thumbnail titles and the shared card
+
+Every thumbnail on the site that is **not a hero image** is labelled with the
+`ComposeResourceTitle` construction rather than the bare `dcterms:title`: the home page's
+masonry and discover tiles, the דפדוף gallery/lightbox captions, and the `.archive-item`
+result cards on the search-results, Person/Org and Event pages. Hero images keep
+`displayTitle()`. `ComposeResourceTitle` is the single source of truth — do not rebuild a
+title anywhere else.
+
+Where the card prints an `.item-type-grid` chip above the title, the title must not repeat
+the type. `ComposeResourceTitle::withoutType()` / `partsWithoutType()` own that rule: they
+drop the leading part **only for Documents (15) and Photographs (20)**, the sole branch
+whose `parts()[0]` is a type. An Event, Person or Organization leads with its own title, so
+dropping the first part there would lose the name. Never do the dropping at a call site.
+
+`view/common/archive-item-card.phtml` is the one copy of the result-card markup, shared by
+`search-results.phtml`, `item-person-org.phtml` and `item-event.phtml` (each previously held
+an identical copy). Params: `resource`, `showType` (default true — Person/Org Event cards
+pass false), `placeholderThumb` (default null; search results pass the placeholder asset,
+which also drives the `.item-visual.is-placeholder` class). It renders **both** titles —
+`.item-name-composed` and `.item-name-plain` — and `site.css` picks one per view mode: the
+composed title in grid view, where `.is-grid .meta-col:not(.title-col)` hides every other
+column, and the plain title in list view, which has its own artist/date/medium columns and
+would otherwise say the same things twice. Flipping that choice is deleting the
+`.is-list .item-name-*` rules; no JS is involved, the switcher is a class toggle.
+
 **Publications are split differently for a Person and for an Organization**, on purpose.
 A Person has no direct Document edge, so their single **מדיה** section is the
 second-degree list reached through their Events — unchanged since the redesign. An
@@ -241,7 +267,9 @@ currently unused by any template),
 `relatedDocsAndPhotos()`, `directDocuments()` / `docsFromEventsByRole()` (the two
 Organization publication sections above — both return `[]` for any other template), and
 `primaryFileLink()` (the hero "open file" target, or the YouTube link for a video
-Document).
+Document), and `cardData($resource, $showType = true)` (one card's columns; its `composed`
+key is the ComposeResourceTitle title, with the type dropped when `$showType` and a type
+chip will be shown, and `name` stays the plain display title for list view).
 
 **The creators cloud carries Organizations as well as People.** The role properties in
 `ItemRelations::ROLE_PROPS` take an *Agent* — template 17 or 18 — so `creatorGroups()`
@@ -268,7 +296,8 @@ are intentionally omitted.
   Reference module.
 - `view/common/search-results.phtml` — the results layout (4-column filter drawer + result grid
   + pager). Rendered by a branch in `view/omeka/site/item/browse.phtml` when search params are
-  present (item-set / plain browse are unaffected).
+  present (item-set / plain browse are unaffected). The result cards themselves come from the
+  shared `view/common/archive-item-card.phtml` (see **Thumbnail titles and the shared card**).
 - `view/common/site-header.phtml` — the search panel form and hamburger item-type links feed the
   results page.
 - `asset/js/site.js` → `setupSearchFilters()` — filter-drawer toggle and gating of the domain /

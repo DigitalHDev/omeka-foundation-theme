@@ -1,0 +1,44 @@
+<?php
+/**
+ * One `.archive-item` card in a results grid.
+ *
+ * Shared by search-results.phtml, item-person-org.phtml and item-event.phtml,
+ * which each carried a byte-identical copy of this markup before. All card data
+ * comes from ItemRelations::cardData(); the title shown in grid view is the
+ * ComposeResourceTitle construction, with the type omitted when the
+ * .item-type-grid chip above it already says it. List view keeps the plain
+ * display title, because it has its own artist/date/medium columns - the swap
+ * is CSS only (.item-name-composed / .item-name-plain in site.css).
+ *
+ * @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $resource
+ * @var bool $showType Render the type chip above the title. Default true.
+ * @var string|null $placeholderThumb Image for resources with no thumbnail.
+ *      When null (the default) the visual is simply left empty.
+ */
+$escape = $this->plugin('escapeHtml');
+$showType = isset($showType) ? $showType : true;
+$placeholderThumb = isset($placeholderThumb) ? $placeholderThumb : null;
+
+$card = $this->ItemRelations()->cardData($resource, $showType);
+$thumb = $card['thumb'] ?: $placeholderThumb;
+$isPlaceholder = !$card['thumb'] && $placeholderThumb;
+?>
+<div class="archive-item">
+    <a href="<?php echo $escape($card['url']); ?>" class="item-link">
+        <div class="item-visual<?php echo $isPlaceholder ? ' is-placeholder' : ''; ?>">
+            <?php if ($thumb): ?><img src="<?php echo $escape($thumb); ?>" alt=""><?php endif; ?>
+        </div>
+        <div class="item-metadata">
+            <div class="meta-col title-col">
+                <?php if ($card['showType']): ?><p class="item-type-grid"><?php echo $escape($card['type']); ?></p><?php endif; ?>
+                <h4 class="item-name">
+                    <span class="item-name-composed"><?php echo $escape($card['composed']); ?></span>
+                    <span class="item-name-plain"><?php echo $escape($card['name']); ?></span>
+                </h4>
+            </div>
+            <div class="meta-col artist-col"><?php echo $escape($card['artist']); ?></div>
+            <div class="meta-col date-col"><?php echo $escape($card['date']); ?></div>
+            <div class="meta-col medium-col"><?php echo $escape($card['medium']); ?></div>
+        </div>
+    </a>
+</div>

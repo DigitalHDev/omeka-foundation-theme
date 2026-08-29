@@ -391,6 +391,12 @@ main a[href^="tel:"]::after,
 ---------------------------------------- */
 .item-type-grid {font-family: var(--font-narkiss); font-size: 14px;  margin: 15px 0 5px 0; }
 .item-name{font-family: var(--font-frank); font-size: var(--base-font-size); font-weight: 300;  margin: 0; }
+/* Card titles: the ComposeResourceTitle construction by default; the plain
+   display title only in list view, which has its own artist/date/medium
+   columns and would otherwise repeat them. See view/common/archive-item-card.phtml. */
+.item-name-plain { display: none; }
+.is-list .item-name-composed { display: none; }
+.is-list .item-name-plain { display: inline; }
 #search-panel {
   position: fixed;
   top: 0;
