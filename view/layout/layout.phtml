@@ -9,7 +9,10 @@ $this->headMeta()->setCharset('utf-8');
 $this->headMeta()->appendName('viewport', 'width=device-width, initial-scale=1');
 // Force a single, fixed document title on every page, overriding anything
 // individual page templates may have appended to the headTitle container.
-$this->headTitle()->set('מאגר קרמיקה ישראלית');
+// A page template may override it by setting the 'documentTitle' placeholder;
+// the item partials do, as "<site> - <hero label> - <hero title>".
+$documentTitle = trim((string) $this->placeholder('documentTitle'));
+$this->headTitle()->set('' !== $documentTitle ? $documentTitle : 'מאגר מידע קרמיקה ישראלית');
 
 // Base Foundation stylesheet (still used by browse/item pages being redesigned
 // separately); the new design system in css/site.css is appended last so it wins.

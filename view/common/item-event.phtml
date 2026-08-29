@@ -17,6 +17,11 @@ $this->htmlElement('body')->appendAttribute('class', 'item-child');
 
 $relations = $this->ItemRelations();
 
+// Document title: site - hero label - hero title (see view/layout/layout.phtml).
+$this->placeholder('documentTitle')->set(
+    'מאגר מידע קרמיקה ישראלית - אירועים - ' . $item->displayTitle()
+);
+
 // Perf probe: ?irdebug=N&probe=TOKEN (see helper/PerfProbe.php). Stages:
 //   1 = parentResource, 2 = creatorGroups, 3 = relatedDocsAndPhotos (3 = full run).
 $probe = $this->PerfProbe()->begin('irdebug');

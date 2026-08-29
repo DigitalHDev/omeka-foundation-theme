@@ -19,6 +19,11 @@ $probe = $this->PerfProbe()->begin('irdebug');
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
 $typeLabel = $templateId === 18 ? 'ארגונים' : 'אנשים';
 
+// Document title: site - hero label - hero title (see view/layout/layout.phtml).
+$this->placeholder('documentTitle')->set(
+    'מאגר מידע קרמיקה ישראלית - ' . $typeLabel . ' - ' . $item->displayTitle()
+);
+
 $heroImage = $item->thumbnailDisplayUrl('large');
 $description = $item->value('dcterms:description');
 $birthDate = $item->value('ceramic:birthDate');
