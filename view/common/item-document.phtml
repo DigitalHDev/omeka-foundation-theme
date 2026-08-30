@@ -88,15 +88,6 @@ $externalLinks = $item->value('bibo:uri', ['all' => true]);
 $hasDetails = $detailRows || $externalLinks;
 ?>
 
-<?php if ($parent): ?>
-<div class="item-parent-bar section-container">
-    <a href="<?php echo $escape($parent->url()); ?>" class="item-parent-link">
-        <i class="ph-light ph-arrow-right"></i>
-        <span>חזרה אל: <?php echo $escape($parent->displayTitle()); ?></span>
-    </a>
-</div>
-<?php endif; ?>
-
 <section class="section-container item-hero-grid condensed">
     <?php if ($heroImage): ?>
     <div class="hero-visual small-thumb<?php echo $heroIsPlaceholder ? ' is-placeholder' : ''; ?>">
@@ -115,6 +106,14 @@ $hasDetails = $detailRows || $externalLinks;
     <?php endif; ?>
 
     <div class="hero-text">
+        <?php if ($parent): ?>
+        <div class="item-parent-bar">
+            <a href="<?php echo $escape($parent->url()); ?>" class="item-parent-link">
+                <i class="ph-light ph-arrow-right"></i>
+                <span>חזרה אל: <?php echo $escape($parent->displayTitle()); ?></span>
+            </a>
+        </div>
+        <?php endif; ?>
         <p class="hero-label"><?php echo $escape($typeLabel); ?></p>
         <h1 class="hero-title"><?php echo $escape($item->displayTitle()); ?></h1>
         <?php if ($date): ?>

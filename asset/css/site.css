@@ -905,6 +905,13 @@ body:not(.item) #results-container.is-grid {
   padding-bottom: clamp(18px, 2.4vw, 26px);
   border-bottom: 1px solid rgba(30, 30, 28, 0.1);
 }
+/* Inside the hero text column it is no longer a full-width bar: it is the
+   first line of the column, so it drops the rule and the leading padding. */
+.hero-text .item-parent-bar {
+  padding-top: 0;
+  padding-bottom: 10px;
+  border-bottom: 0;
+}
 .item-parent-link {
   display: inline-flex;
   align-items: center;
