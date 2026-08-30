@@ -17,7 +17,7 @@ $relations = $this->ItemRelations();
 $probe = $this->PerfProbe()->begin('irdebug');
 
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
-$typeLabel = $templateId === 18 ? 'ארגונים' : 'אנשים';
+$typeLabel = $this->ResourceTypeLabel($item);
 
 // Document title: site - hero label - hero title (see view/layout/layout.phtml).
 $this->placeholder('documentTitle')->set(

@@ -23,7 +23,7 @@ $probe = $this->PerfProbe()->begin('irdebug');
 
 $templateId = $item->resourceTemplate() ? $item->resourceTemplate()->id() : null;
 $isPhotograph = $templateId === OmekaTheme\Helper\ItemRelations::TPL_PHOTOGRAPH;
-$typeLabel = $isPhotograph ? 'צילומים' : 'מדיה';
+$typeLabel = $this->ResourceTypeLabel($item);
 
 // Document title: site - hero label - hero title (see view/layout/layout.phtml).
 $this->placeholder('documentTitle')->set(
@@ -52,6 +52,14 @@ foreach (['dcterms:type', 'cidoc:P19i_was_made_for'] as $term) {
 }
 
 $parent = $relations->parentResource($item);
+// Back-link text: the section label of the page it leads to, then that page's
+// title - "חזרה אל: אירועים, שבילי יער". The label comes from the same
+// helper the hero uses, so the two cannot drift apart.
+$parentLabelledTitle = '';
+if ($parent) {
+    $parentLabel = $this->ResourceTypeLabel($parent);
+    $parentLabelledTitle = ($parentLabel ? $parentLabel . ', ' : '') . $parent->displayTitle();
+}
 $probe->stage(1, 'parentResource', $parent ? $parent->id() : null);
 $creatorGroups = $relations->creatorGroups($item);
 $probe->stage(2, 'creatorGroups', count($creatorGroups));
@@ -110,7 +118,7 @@ $hasDetails = $detailRows || $externalLinks;
         <div class="item-parent-bar">
             <a href="<?php echo $escape($parent->url()); ?>" class="item-parent-link">
                 <i class="ph-light ph-arrow-right"></i>
-                <span>חזרה אל: <?php echo $escape($parent->displayTitle()); ?></span>
+                <span>חזרה אל: <?php echo $escape($parentLabelledTitle); ?></span>
             </a>
         </div>
         <?php endif; ?>

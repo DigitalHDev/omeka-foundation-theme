@@ -31,7 +31,7 @@ This is a customized version of the Omeka S Foundation theme ("Foundation-Dev", 
   hamburger, filter drawer, view switcher, lightbox); `show.js` / `browse.js` are legacy.
 - `helper/` — PHP view helper classes (`TabManager.php`, `SecondDegreeResources.php`,
   `ItemRelations.php`, `HomeGraph.php`, `ComposeResourceTitle.php`, `FacetedSearch.php`,
-  `ResourcePlaceholder.php`).
+  `ResourcePlaceholder.php`, `ResourceTypeLabel.php`).
 - `config/theme.ini` — Theme configuration: metadata, form elements for admin settings, resource page regions/blocks, block templates, page templates.
 
 ### Custom additions beyond upstream Foundation theme
@@ -233,6 +233,25 @@ composed title in grid view, where `.is-grid .meta-col:not(.title-col)` hides ev
 column, and the plain title in list view, which has its own artist/date/medium columns and
 would otherwise say the same things twice. Flipping that choice is deleting the
 `.is-list .item-name-*` rules; no JS is involved, the switcher is a class toggle.
+
+### Section labels and the parent bar
+
+`helper/ResourceTypeLabel.php` owns the resource-template -> section-label mapping:
+Documents (15) `מדיה`, Events (16) `אירועים`, People (17) `אנשים`,
+Organizations (18) `ארגונים`, Photographs (20) `צילומים`; anything else is `null`.
+All three item-show partials print it as the `.hero-label`, and the `.item-parent-bar`
+back-link reuses it so the link names the section it leads to:
+`חזרה אל: <label>, <parent title>` (e.g. `חזרה אל: אירועים, שבילי יער`). With no label
+the link falls back to the bare title. Do not hard-code one of these strings at a call site.
+
+This is **not** the same list as `FacetedSearch::TYPES`, which is the search drawer's
+checkbox list: it covers only the four selectable types and folds Photographs into
+Documents. The two are deliberately separate.
+
+The parent bar is rendered **inside** `.hero-text`, above the `.hero-label`, so the hero
+`<section class="section-container item-hero-grid condensed">` is the first element in
+`<main>`. It carries no `section-container` class of its own there, and
+`.hero-text .item-parent-bar` drops the full-width divider and the leading padding.
 
 ### Thumbnail placeholders
 
