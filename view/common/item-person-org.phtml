@@ -24,7 +24,12 @@ $this->placeholder('documentTitle')->set(
     'מאגר מידע קרמיקה ישראלית - ' . $typeLabel . ' - ' . $item->displayTitle()
 );
 
-$heroImage = $item->thumbnailDisplayUrl('large') ?: $this->ResourcePlaceholder($item);
+// No image of its own: fall back to the per-template placeholder. The markup
+// flags it so the hero renders it small (200px) rather than filling the column.
+// thumbnailDisplayUrl() is not memoized, so it is read once into a local.
+$heroImage = $item->thumbnailDisplayUrl('large');
+$heroIsPlaceholder = !$heroImage;
+$heroImage = $heroImage ?: $this->ResourcePlaceholder($item);
 $description = $item->value('dcterms:description');
 $birthDate = $item->value('ceramic:birthDate');
 
@@ -108,7 +113,7 @@ $renderCard = function ($resource, $showType = true) use ($partial) {
 ?>
 
 <section class="section-container item-hero-grid">
-    <div class="hero-visual">
+    <div class="hero-visual<?php echo $heroIsPlaceholder ? ' is-placeholder' : ''; ?>">
         <?php if ($heroImage): ?>
         <img src="<?php echo $escape($heroImage); ?>" alt="<?php echo $escape($item->displayTitle()); ?>">
         <?php endif; ?>

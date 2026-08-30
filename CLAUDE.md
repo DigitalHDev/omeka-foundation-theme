@@ -250,12 +250,15 @@ It applies in two places. `cardData()` falls back to it after the real-thumbnail
 resolution and reports `isPlaceholder`, so **every** result card on every page is
 covered; the `placeholderThumb` param `search-results.phtml` used to pass into
 `archive-item-card.phtml` is gone. The three item-show heroes fall back to it inline
-(`->ResourcePlaceholder()` — exact case, as with every theme helper). Both
-the full-size hero and the condensed item-child hero let the placeholder fill the
-column exactly as a real image does, so no CSS was needed there; `.is-placeholder`
-sizing applies only in the grid, where the image is capped at 200×200 and
-`object-fit: contain` letterboxes the taller `event-placeholder.png` (544×701) rather
-than stretching it.
+(`$this->ResourcePlaceholder($item)` — exact case, as with every theme helper) and set
+`$heroIsPlaceholder`, which puts `.is-placeholder` on the `.hero-visual` wrapper.
+
+**A placeholder is never blown up to the size of a real image.** In the grid it is
+capped at 200×200, where the inherited `object-fit: contain` letterboxes the taller
+`event-placeholder.png` (544×701) rather than stretching it. In both heroes — full-size
+and condensed — it renders 200px wide with auto height instead of filling the column;
+on a video Document the surrounding `.hero-file-link` shrinks to match, which is why
+that selector is repeated at higher specificity in `site.css`.
 
 On a **video Document** — a `bibo:uri` and no media — `primaryFileLink()` is non-null
 while the thumbnail is null, so the placeholder renders wrapped in the

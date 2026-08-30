@@ -1100,6 +1100,21 @@ body.lightbox-open {
   border-bottom: 0;
 }
 .hero-visual img { width: 100%; height: auto; display: block; }
+/* A placeholder stand-in is not the subject of the page: show it at its own
+   modest size instead of blowing it up to the width of the hero column. The
+   second selector beats .item-child .small-thumb .hero-file-link img, which a
+   video Document's placeholder sits inside. */
+.hero-visual.is-placeholder img,
+.item-child .hero-visual.is-placeholder .hero-file-link img {
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+}
+.item-child .hero-visual.is-placeholder .hero-file-link {
+  display: inline-block;
+  width: 200px;
+  max-width: 100%;
+}
 .hero-text { text-align: right; }
 .hero-label { font-family: var(--font-narkiss); font-size: 13px; letter-spacing: 0.04em; color: var(--oxide-red); margin-bottom: 10px; }
 .hero-title {  font-size: var(--type-title-md); line-height: 1.12; margin: 10px 0; }

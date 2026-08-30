@@ -26,7 +26,11 @@ $this->placeholder('documentTitle')->set(
 //   1 = parentResource, 2 = creatorGroups, 3 = relatedDocsAndPhotos (3 = full run).
 $probe = $this->PerfProbe()->begin('irdebug');
 
-$heroImage = $relations->eventThumbnail($item, 'large') ?: $this->ResourcePlaceholder($item);
+// No borrowable Document image: fall back to the per-template placeholder. The
+// markup flags it so the hero renders it small (200px), not filling the column.
+$heroImage = $relations->eventThumbnail($item, 'large');
+$heroIsPlaceholder = !$heroImage;
+$heroImage = $heroImage ?: $this->ResourcePlaceholder($item);
 $description = $item->value('dcterms:description');
 $date = $item->value('dcterms:date');
 
@@ -81,7 +85,7 @@ $renderCard = function ($resource) use ($partial) {
 
 <section class="section-container item-hero-grid condensed">
     <?php if ($heroImage): ?>
-    <div class="hero-visual small-thumb">
+    <div class="hero-visual small-thumb<?php echo $heroIsPlaceholder ? ' is-placeholder' : ''; ?>">
         <img src="<?php echo $escape($heroImage); ?>" alt="<?php echo $escape($item->displayTitle()); ?>">
     </div>
     <?php endif; ?>

@@ -30,7 +30,12 @@ $this->placeholder('documentTitle')->set(
     'מאגר מידע קרמיקה ישראלית - ' . $typeLabel . ' - ' . $item->displayTitle()
 );
 
-$heroImage = $item->thumbnailDisplayUrl('large') ?: $this->ResourcePlaceholder($item);
+// No image of its own: fall back to the per-template placeholder. The markup
+// flags it so the hero renders it small (200px) rather than filling the column.
+// thumbnailDisplayUrl() is not memoized, so it is read once into a local.
+$heroImage = $item->thumbnailDisplayUrl('large');
+$heroIsPlaceholder = !$heroImage;
+$heroImage = $heroImage ?: $this->ResourcePlaceholder($item);
 $fileLink = $relations->primaryFileLink($item);
 $description = $item->value('dcterms:description');
 $date = $item->value('dcterms:date');
@@ -94,7 +99,7 @@ $hasDetails = $detailRows || $externalLinks;
 
 <section class="section-container item-hero-grid condensed">
     <?php if ($heroImage): ?>
-    <div class="hero-visual small-thumb">
+    <div class="hero-visual small-thumb<?php echo $heroIsPlaceholder ? ' is-placeholder' : ''; ?>">
         <?php if ($fileLink): ?>
         <a href="<?php echo $escape($fileLink['url']); ?>" target="_blank" rel="noopener" class="hero-file-link">
             <img src="<?php echo $escape($heroImage); ?>" alt="<?php echo $escape($item->displayTitle()); ?>">
