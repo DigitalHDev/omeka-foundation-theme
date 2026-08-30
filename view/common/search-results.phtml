@@ -5,7 +5,6 @@
  * @var \OmekaTheme\Helper\FacetedSearch $search  Already invoked.
  */
 $escape = $this->plugin('escapeHtml');
-$placeholderThumb = $this->assetUrl('img/place-holder_51.png');
 
 $browseUrl = $this->url('site/resource', ['controller' => 'item', 'action' => 'browse'], true);
 
@@ -114,7 +113,6 @@ $resultsTitle = $term !== ''
         <?php foreach ($results as $item): ?>
         <?php echo $this->partial('common/archive-item-card', [
             'resource' => $item,
-            'placeholderThumb' => $placeholderThumb,
         ]); ?>
         <?php endforeach; ?>
     </div>

@@ -12,20 +12,16 @@
  *
  * @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $resource
  * @var bool $showType Render the type chip above the title. Default true.
- * @var string|null $placeholderThumb Image for resources with no thumbnail.
- *      When null (the default) the visual is simply left empty.
  */
 $escape = $this->plugin('escapeHtml');
 $showType = isset($showType) ? $showType : true;
-$placeholderThumb = isset($placeholderThumb) ? $placeholderThumb : null;
 
 $card = $this->ItemRelations()->cardData($resource, $showType);
-$thumb = $card['thumb'] ?: $placeholderThumb;
-$isPlaceholder = !$card['thumb'] && $placeholderThumb;
+$thumb = $card['thumb'];
 ?>
 <div class="archive-item">
     <a href="<?php echo $escape($card['url']); ?>" class="item-link">
-        <div class="item-visual<?php echo $isPlaceholder ? ' is-placeholder' : ''; ?>">
+        <div class="item-visual<?php echo $card['isPlaceholder'] ? ' is-placeholder' : ''; ?>">
             <?php if ($thumb): ?><img src="<?php echo $escape($thumb); ?>" alt=""><?php endif; ?>
         </div>
         <div class="item-metadata">

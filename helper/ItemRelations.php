@@ -468,8 +468,14 @@ class ItemRelations extends AbstractHelper
      * not said twice; ComposeResourceTitle::withoutType() owns that rule.
      * 'name' stays the plain display title, for the list view's own columns.
      *
+     * A resource with no image of its own (and, for an Event, no Document to
+     * borrow one from) falls back to the per-template placeholder;
+     * 'isPlaceholder' tells the card to add .is-placeholder, which sizes the
+     * stand-in down instead of letting it fill the tile.
+     *
      * @param bool $showType Whether the caller renders the .item-type-grid chip.
-     * @return array ['url','thumb','type','showType','name','composed','artist','date','medium']
+     * @return array ['url','thumb','isPlaceholder','type','showType','name',
+     *                'composed','artist','date','medium']
      */
     public function cardData(AbstractResourceEntityRepresentation $resource, $showType = true)
     {
@@ -483,11 +489,18 @@ class ItemRelations extends AbstractHelper
         if (!$thumb && $this->templateId($resource) === self::TPL_EVENT) {
             $thumb = $this->eventThumbnail($resource);
         }
+        $isPlaceholder = false;
+        if (!$thumb) {
+            $placeholder = $this->getView()->plugin('ResourcePlaceholder');
+            $thumb = $placeholder($resource);
+            $isPlaceholder = (bool) $thumb;
+        }
         $showType = $showType && $type !== '';
         $compose = $this->getView()->plugin('ComposeResourceTitle');
         return [
             'url' => $resource->url(),
             'thumb' => $thumb,
+            'isPlaceholder' => $isPlaceholder,
             'type' => $type,
             'showType' => $showType,
             'name' => $resource->displayTitle(),

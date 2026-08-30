@@ -30,7 +30,8 @@ This is a customized version of the Omeka S Foundation theme ("Foundation-Dev", 
 - `asset/js/` — JavaScript files. `site.js` drives the active design chrome (search panel,
   hamburger, filter drawer, view switcher, lightbox); `show.js` / `browse.js` are legacy.
 - `helper/` — PHP view helper classes (`TabManager.php`, `SecondDegreeResources.php`,
-  `ItemRelations.php`, `HomeGraph.php`, `ComposeResourceTitle.php`, `FacetedSearch.php`).
+  `ItemRelations.php`, `HomeGraph.php`, `ComposeResourceTitle.php`, `FacetedSearch.php`,
+  `ResourcePlaceholder.php`).
 - `config/theme.ini` — Theme configuration: metadata, form elements for admin settings, resource page regions/blocks, block templates, page templates.
 
 ### Custom additions beyond upstream Foundation theme
@@ -224,14 +225,46 @@ dropping the first part there would lose the name. Never do the dropping at a ca
 
 `view/common/archive-item-card.phtml` is the one copy of the result-card markup, shared by
 `search-results.phtml`, `item-person-org.phtml` and `item-event.phtml` (each previously held
-an identical copy). Params: `resource`, `showType` (default true — Person/Org Event cards
-pass false), `placeholderThumb` (default null; search results pass the placeholder asset,
-which also drives the `.item-visual.is-placeholder` class). It renders **both** titles —
+an identical copy). Params: `resource` and `showType` (default true — Person/Org Event
+cards pass false); the placeholder image is no longer passed in, it comes from
+`cardData()` (see **Thumbnail placeholders**). It renders **both** titles —
 `.item-name-composed` and `.item-name-plain` — and `site.css` picks one per view mode: the
 composed title in grid view, where `.is-grid .meta-col:not(.title-col)` hides every other
 column, and the plain title in list view, which has its own artist/date/medium columns and
 would otherwise say the same things twice. Flipping that choice is deleting the
 `.is-list .item-name-*` rules; no JS is involved, the switcher is a class toggle.
+
+### Thumbnail placeholders
+
+A resource with no image of its own gets a per-template stand-in, and
+`helper/ResourcePlaceholder.php` is the single source of truth for that mapping:
+Documents (15) and Photographs (20) `place-holder_51.png`, Events (16)
+`event-placeholder.png`, People (17) `person-placeholder.jpg`, Organizations (18)
+`org-placeholder.jpg`. Any other template gets `null`. Do not hard-code a placeholder
+path at a call site. The helper owns the mapping and nothing else — resolving a
+resource's *real* thumbnail stays in `ItemRelations::cardData()` (including the
+Event's borrowed Document image) and in `thumbnailDisplayUrl()` at the hero call sites,
+so it forks no traversal rule.
+
+It applies in two places. `cardData()` falls back to it after the real-thumbnail
+resolution and reports `isPlaceholder`, so **every** result card on every page is
+covered; the `placeholderThumb` param `search-results.phtml` used to pass into
+`archive-item-card.phtml` is gone. The three item-show heroes fall back to it inline
+(`->ResourcePlaceholder()` — exact case, as with every theme helper). Both
+the full-size hero and the condensed item-child hero let the placeholder fill the
+column exactly as a real image does, so no CSS was needed there; `.is-placeholder`
+sizing applies only in the grid, where the image is capped at 200×200 and
+`object-fit: contain` letterboxes the taller `event-placeholder.png` (544×701) rather
+than stretching it.
+
+On a **video Document** — a `bibo:uri` and no media — `primaryFileLink()` is non-null
+while the thumbnail is null, so the placeholder renders wrapped in the
+"צפייה בסרטון" `.hero-file-link`. That is intended: the affordance is real.
+
+The home page is deliberately untouched: `HomeGraph::imagePool()` / `discoverTile()`
+only select resources with a confirmed image, so no home tile is ever
+placeholder-eligible. The דפדוף gallery tiles are media files rather than resources
+and keep skipping a thumb-less entry.
 
 **Publications are split differently for a Person and for an Organization**, on purpose.
 A Person has no direct Document edge, so their single **מדיה** section is the

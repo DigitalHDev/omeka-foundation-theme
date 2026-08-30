@@ -769,6 +769,9 @@ body:not(.item) #results-container.is-grid {
 .is-grid .item-visual.is-placeholder img {
     width: 200px;
     max-width: 100%;
+    /* event-placeholder.png is taller than the others (544x701); cap it so a
+       mixed row of placeholders keeps one height. */
+    max-height: 200px;
     height: auto;
 }
 .is-grid .item-metadata {

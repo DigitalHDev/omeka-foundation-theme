@@ -30,7 +30,7 @@ $this->placeholder('documentTitle')->set(
     'מאגר מידע קרמיקה ישראלית - ' . $typeLabel . ' - ' . $item->displayTitle()
 );
 
-$heroImage = $item->thumbnailDisplayUrl('large');
+$heroImage = $item->thumbnailDisplayUrl('large') ?: $this->ResourcePlaceholder($item);
 $fileLink = $relations->primaryFileLink($item);
 $description = $item->value('dcterms:description');
 $date = $item->value('dcterms:date');

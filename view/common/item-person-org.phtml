@@ -24,7 +24,7 @@ $this->placeholder('documentTitle')->set(
     'מאגר מידע קרמיקה ישראלית - ' . $typeLabel . ' - ' . $item->displayTitle()
 );
 
-$heroImage = $item->thumbnailDisplayUrl('large');
+$heroImage = $item->thumbnailDisplayUrl('large') ?: $this->ResourcePlaceholder($item);
 $description = $item->value('dcterms:description');
 $birthDate = $item->value('ceramic:birthDate');
 
