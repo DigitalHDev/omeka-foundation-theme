@@ -42,14 +42,14 @@ $resultsTitle = $term !== ''
     <div class="section-container">
         <div class="results-meta">
             <h1 class="results-title"><?php echo $escape($resultsTitle); ?></h1>
-            <button id="toggle-filters" class="filter-btn-outline" type="button" aria-expanded="true" aria-controls="filter-drawer">
-                סינון תוצאות <i class="ph-light ph-caret-up"></i>
+            <button id="toggle-filters" class="filter-btn-outline" type="button" aria-expanded="false" aria-controls="filter-drawer">
+                סינון תוצאות <i class="ph-light ph-caret-down"></i>
             </button>
         </div>
     </div>
 </header>
 
-<div id="filter-drawer" class="drawer-open">
+<div id="filter-drawer" class="drawer-closed">
     <form class="section-container-1" method="GET" action="<?php echo $escape($browseUrl); ?>">
         <input type="hidden" name="q" value="<?php echo $escape($term); ?>">
         <div class="filter-grid">
