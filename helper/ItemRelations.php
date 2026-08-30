@@ -357,6 +357,60 @@ class ItemRelations extends AbstractHelper
     }
 
     /**
+     * The text of the item page's "back to" parent-bar link, without the
+     * "חזרה אל: " prefix. Takes the resource parentResource() returned.
+     *
+     *  - Event (16): "<dcterms:type> - <event title>, <org>, <year>". The
+     *    Organization is the Event's own parentResource(), so this forks no
+     *    traversal rule; the type falls back to the section label (אירועים)
+     *    when the Event carries no dcterms:type.
+     *  - Person (17) / Organization (18): "<section label>, <title>".
+     *
+     * Labels come from the ResourceTypeLabel helper, which owns the
+     * template -> label mapping the hero prints as its .hero-label.
+     *
+     * @return string
+     */
+    public function parentLinkTitle(AbstractResourceEntityRepresentation $parent)
+    {
+        $label = (string) $this->getView()->ResourceTypeLabel($parent);
+        if ($this->templateId($parent) !== self::TPL_EVENT) {
+            return $this->joinTitleParts([$label, $parent->displayTitle()]);
+        }
+
+        $type = trim((string) $parent->value('dcterms:type'));
+        $type = $type !== '' ? $type : $label;
+        $head = $type !== ''
+            ? $type . ' - ' . $parent->displayTitle()
+            : $parent->displayTitle();
+        $org = $this->parentResource($parent);
+
+        return $this->joinTitleParts([
+            $head,
+            $org ? $org->displayTitle() : '',
+            trim((string) $parent->value('dcterms:date')),
+        ]);
+    }
+
+    /**
+     * Join non-empty, trimmed parts with ", ".
+     *
+     * @param string[] $parts
+     * @return string
+     */
+    protected function joinTitleParts(array $parts)
+    {
+        $clean = [];
+        foreach ($parts as $part) {
+            $part = trim((string) $part);
+            if ($part !== '') {
+                $clean[] = $part;
+            }
+        }
+        return implode(', ', $clean);
+    }
+
+    /**
      * Agents — People and Organizations — credited on an item, grouped by the
      * creator-role property that links them. Feeds the ".creators-link-cloud"
      * block. Within a group, People come first, then Organizations, each in the

@@ -239,10 +239,21 @@ would otherwise say the same things twice. Flipping that choice is deleting the
 `helper/ResourceTypeLabel.php` owns the resource-template -> section-label mapping:
 Documents (15) `מדיה`, Events (16) `אירועים`, People (17) `אנשים`,
 Organizations (18) `ארגונים`, Photographs (20) `צילומים`; anything else is `null`.
-All three item-show partials print it as the `.hero-label`, and the `.item-parent-bar`
-back-link reuses it so the link names the section it leads to:
-`חזרה אל: <label>, <parent title>` (e.g. `חזרה אל: אירועים, שבילי יער`). With no label
-the link falls back to the bare title. Do not hard-code one of these strings at a call site.
+All three item-show partials print it as the `.hero-label`. Do not hard-code one of these
+strings at a call site.
+
+The `.item-parent-bar` back-link text is built by **`ItemRelations::parentLinkTitle()`**,
+which takes whatever `parentResource()` returned and composes it by template. The
+`חזרה אל: ` prefix stays in the template; everything after it comes from the helper:
+
+| Parent | Link text |
+|---|---|
+| Event (16) | `<dcterms:type> - <event title>, <org>, <year>` — the org is the Event's own `parentResource()`, the year its raw `dcterms:date`; an Event with no `dcterms:type` falls back to the section label (`אירועים`) |
+| Person (17) / Organization (18) | `<section label>, <title>` |
+
+Empty parts are dropped, so a missing org or date leaves no stray comma. This is **not**
+`ComposeResourceTitle` — that helper's Event form leads with the title and carries creators
+and solo/group, and it stays the single source of truth for *thumbnail* titles.
 
 This is **not** the same list as `FacetedSearch::TYPES`, which is the search drawer's
 checkbox list: it covers only the four selectable types and folds Photographs into

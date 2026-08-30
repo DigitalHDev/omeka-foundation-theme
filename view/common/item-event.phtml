@@ -46,14 +46,10 @@ foreach (['dcterms:type', 'cidoc:P19i_was_made_for'] as $term) {
 }
 
 $parent = $relations->parentResource($item);
-// Back-link text: the section label of the page it leads to, then that page's
-// title - "חזרה אל: אירועים, שבילי יער". The label comes from the same
-// helper the hero uses, so the two cannot drift apart.
-$parentLabelledTitle = '';
-if ($parent) {
-    $parentLabel = $this->ResourceTypeLabel($parent);
-    $parentLabelledTitle = ($parentLabel ? $parentLabel . ', ' : '') . $parent->displayTitle();
-}
+// Back-link text: names the page it leads to - an Event by its type, title,
+// organization and year, a Person/Organization by its section label and title.
+// See ItemRelations::parentLinkTitle().
+$parentLinkTitle = $parent ? $relations->parentLinkTitle($parent) : '';
 $probe->stage(1, 'parentResource', $parent ? $parent->id() : null);
 $creatorGroups = $relations->creatorGroups($item);
 $probe->stage(2, 'creatorGroups', count($creatorGroups));
@@ -94,7 +90,7 @@ $renderCard = function ($resource) use ($partial) {
         <div class="item-parent-bar">
             <a href="<?php echo $escape($parent->url()); ?>" class="item-parent-link">
                 <i class="ph-light ph-arrow-right"></i>
-                <span>חזרה אל: <?php echo $escape($parentLabelledTitle); ?></span>
+                <span>חזרה אל: <?php echo $escape($parentLinkTitle); ?></span>
             </a>
         </div>
         <?php endif; ?>
